@@ -1,0 +1,23 @@
+{
+  "name": "api_adscreen",
+  "version": "1.0.0",
+  "description": "project stucture",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.54.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^4.18.2",
+    "zod": "^4.0.15"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}

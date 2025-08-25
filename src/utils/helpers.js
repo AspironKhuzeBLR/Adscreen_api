@@ -1,12 +1,4 @@
-/**
- * Utility functions for the AdScreen Hub Backend
- */
-
-/**
- * Generate a random string of specified length
- * @param {number} length - Length of the string to generate
- * @returns {string} Random string
- */
+//HELPER.JS
 const generateRandomString = (length = 10) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';

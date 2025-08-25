@@ -1,24 +1,18 @@
-// src/api/routes/authRoutes.js
+// src/api/routes/auth.routes.js
+const { Router } = require('express');
+const authController = require('../controllers/authController');
 
-const express = require('express');
-const router = express.Router();
-const { 
-    registerUser, 
-    loginUser, 
-    getMe, 
-    sendPhoneVerification, // Import
-    verifyPhoneOtp         // Import
-} = require('../controllers/authController');
-const { protect } = require('../middleware/authMiddleware');
+const router = Router();
 
-// Public Routes
-router.post('/register', registerUser);
-router.post('/login', loginUser);
+// --- Registration Flow ---
+router.post('/start-phone-verification', authController.startPhoneVerification);
+router.post('/verify-phone', authController.verifyPhone);
+router.post('/start-email-verification', authController.startEmailVerification);
+router.post('/verify-email', authController.verifyEmail);
+router.post('/complete-registration', authController.completeRegistration);
 
-// Protected Routes
-router.get('/me', protect, getMe);
-router.post('/send-phone-otp', protect, sendPhoneVerification);
-router.post('/verify-phone-otp', protect, verifyPhoneOtp);
+// --- Standard Auth ---
+router.post('/login', authController.login);
 
 
 module.exports = router;

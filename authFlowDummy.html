@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AdScreenHub - Final Registration Flow</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f9; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 450px; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        h2 { text-align: center; color: #333; margin-top: 0; }
+        .form-group { margin-bottom: 20px; position: relative; }
+        label { display: block; margin-bottom: 5px; color: #555; font-weight: 500; }
+        .input-with-btn { display: flex; }
+        .input-with-btn input { flex-grow: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+        .input-with-btn button { border-top-left-radius: 0; border-bottom-left-radius: 0; width: auto; padding: 10px 15px; }
+        input[type="text"], input[type="email"], input[type="password"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 4px; background-color: #007bff; color: white; font-size: 16px; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #a0cffa; cursor: not-allowed; }
+        .otp-inputs { display: flex; justify-content: space-between; margin-top: 10px; }
+        .otp-inputs input { width: 40px; height: 40px; text-align: center; font-size: 18px; border: 1px solid #ccc; border-radius: 4px; }
+        .info { background-color: #e9f5ff; border-left: 4px solid #007bff; padding: 10px; margin-bottom: 20px; font-size: 14px; }
+        .warning { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; font-size: 13px; }
+        .success-msg { color: #28a745; font-size: 13px; margin-top: 5px; }
+        .api-simulation { font-family: 'Courier New', Courier, monospace; background: #2d3748; color: #9ae6b4; padding: 15px; border-radius: 5px; margin-top: 20px; font-size: 13px; white-space: pre-wrap; word-wrap: break-word; }
+        .verified-check { color: #28a745; font-weight: bold; margin-left: 10px; }
+        .verify-link-btn { background-color: #28a745; margin-top: 10px; }
+        .verify-link-btn:hover { background-color: #218838; }
+        .password-toggle { position: absolute; right: 10px; top: 35px; background: none; border: none; cursor: pointer; color: #888; padding: 0; width: auto; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Screen 1: Verification -->
+        <div id="verify-screen" class="screen active">
+            <h2>Create an account</h2>
+            <div class="info">Step 1: Verify your email & mobile number</div>
+            <div class="form-group">
+                <label for="email">Verify email <span id="email-verified-check" class="verified-check" style="display:none;">✓ Verified</span></label>
+                <div class="input-with-btn">
+                    <input type="email" id="email" value="test.user@example.com">
+                    <button id="send-email-link-btn">Send Link</button>
+                </div>
+                <div id="email-success" class="success-msg" style="display: none;">
+                    A verification link has been sent to your email.
+                    <button id="simulate-email-click-btn" class="verify-link-btn">Simulate Clicking Email Link</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="phone">Verify Mobile number <span id="phone-verified-check" class="verified-check" style="display:none;">✓ Verified</span></label>
+                <div class="input-with-btn">
+                    <input type="text" id="phone" value="9876543210">
+                    <button id="send-phone-otp-btn">Get OTP</button>
+                </div>
+                <div id="phone-success" class="success-msg" style="display: none;">An OTP has been sent.</div>
+            </div>
+            <div id="phone-otp-group" class="form-group" style="display: none;">
+                <label>Enter Phone OTP</label>
+                <div class="otp-inputs">
+                    <input type="text" maxlength="1" class="otp-input"> <input type="text" maxlength="1" class="otp-input"> <input type="text" maxlength="1" class="otp-input">
+                    <input type="text" maxlength="1" class="otp-input"> <input type="text" maxlength="1" class="otp-input"> <input type="text" maxlength="1" class="otp-input">
+                </div>
+            </div>
+            <button id="next-btn" disabled>Next</button>
+        </div>
+
+        <!-- Screen 2: Enter Details -->
+        <div id="details-screen" class="screen">
+            <h2>Enter Details</h2>
+            <div class="info">Step 2: Complete your profile</div>
+            <div class="warning">
+                <strong>Note:</strong> This is a simulation. Please use a dummy password like `StrongPassword123!` and do not use any real account passwords.
+            </div>
+            <div class="form-group">
+                <label for="full-name">Full Name</label>
+                <input type="text" id="full-name" value="Test User">
+            </div>
+            <div class="form-group">
+                <label for="password">Create Password</label>
+                <input type="password" id="password" value="StrongPassword123!">
+                <button class="password-toggle" onclick="togglePasswordVisibility('password')">👁️</button>
+            </div>
+            <div class="form-group">
+                <label for="confirm-password">Confirm Password</label>
+                <input type="password" id="confirm-password" value="StrongPassword123!">
+                <button class="password-toggle" onclick="togglePasswordVisibility('confirm-password')">👁️</button>
+            </div>
+            <button id="complete-reg-btn">Create Account & Login</button>
+        </div>
+
+        <!-- Screen 3: Success -->
+        <div id="success-screen" class="screen">
+            <h2>Login Successful!</h2>
+            <div class="info">Your account has been created and you are now logged in.</div>
+            <button onclick="window.location.reload()">Start Over</button>
+        </div>
+
+        <div id="api-simulation-box" class="api-simulation" style="display: none;"></div>
+    </div>
+
+    <script>
+        // --- GLOBAL STATE SIMULATION ---
+        const registrationState = {
+            email: '',
+            phoneNumber: '',
+            password: '',
+            dummyEmailToken: null,
+            dummyPhoneOtp: null,
+            isEmailVerified: false,
+            isPhoneVerified: false,
+        };
+
+        // --- UI & STATE MANAGEMENT ---
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function showApiSimulation(title, data) {
+            const box = document.getElementById('api-simulation-box');
+            box.innerHTML = `<strong>${title}</strong><br><br>${JSON.stringify(data, null, 2)}`;
+            box.style.display = 'block';
+        }
+
+        function checkVerificationStatus() {
+            if (registrationState.isEmailVerified && registrationState.isPhoneVerified) {
+                document.getElementById('next-btn').disabled = false;
+            } else {
+                document.getElementById('next-btn').disabled = true;
+            }
+        }
+        
+        function togglePasswordVisibility(fieldId) {
+            const input = document.getElementById(fieldId);
+            const button = input.nextElementSibling;
+            if (input.type === "password") {
+                input.type = "text";
+                button.textContent = "🙈";
+            } else {
+                input.type = "password";
+                button.textContent = "👁️";
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+
+        // Step 1a: Send Email Verification Link
+        document.getElementById('send-email-link-btn').addEventListener('click', () => {
+            registrationState.email = document.getElementById('email').value;
+            registrationState.dummyEmailToken = 'tok_' + crypto.randomUUID();
+            showApiSimulation('1a. POST /api/auth/start-registration (Email)', { request: { email: registrationState.email, phoneNumber: document.getElementById('phone').value }, response: { message: "Verification link sent to email." }, "BEHIND THE SCENES": `Email link would contain token: ${registrationState.dummyEmailToken}` });
+            document.getElementById('email-success').style.display = 'block';
+        });
+
+        // Step 1b: Simulate Email Link Click
+        document.getElementById('simulate-email-click-btn').addEventListener('click', () => {
+            if (registrationState.isEmailVerified) return;
+            showApiSimulation('1b. POST /api/auth/verify-email', { request: { email: registrationState.email, token: registrationState.dummyEmailToken }, response: { statusCode: 200, message: "Email verified successfully." } });
+            registrationState.isEmailVerified = true;
+            document.getElementById('email-verified-check').style.display = 'inline';
+            document.getElementById('email').disabled = true;
+            document.getElementById('send-email-link-btn').disabled = true;
+            document.getElementById('simulate-email-click-btn').style.display = 'none';
+            checkVerificationStatus();
+        });
+
+        // Step 1c: Send Phone OTP
+        document.getElementById('send-phone-otp-btn').addEventListener('click', () => {
+            registrationState.phoneNumber = document.getElementById('phone').value;
+            registrationState.dummyPhoneOtp = '123456';
+            showApiSimulation('1c. POST /api/auth/start-registration (Phone)', { request: { email: document.getElementById('email').value, phoneNumber: registrationState.phoneNumber }, response: { message: "Phone OTP sent." }, "BEHIND THE SCENES": `SMS sent with OTP: ${registrationState.dummyPhoneOtp}` });
+            document.getElementById('phone-success').style.display = 'block';
+            document.getElementById('phone-otp-group').style.display = 'block';
+        });
+
+        // Live verification for phone OTP
+        document.querySelectorAll('#phone-otp-group .otp-input').forEach((input, index, inputs) => {
+            input.addEventListener('keyup', (e) => {
+                if (e.target.value.length === 1 && index < inputs.length - 1) inputs[index + 1].focus();
+                const enteredPhoneOtp = Array.from(inputs).map(i => i.value).join('');
+                if (enteredPhoneOtp.length === 6 && enteredPhoneOtp === registrationState.dummyPhoneOtp && !registrationState.isPhoneVerified) {
+                    registrationState.isPhoneVerified = true;
+                    document.getElementById('phone-verified-check').style.display = 'inline';
+                    document.getElementById('phone').disabled = true;
+                    document.getElementById('send-phone-otp-btn').disabled = true;
+                    checkVerificationStatus();
+                }
+            });
+        });
+
+        // Step 1d: Go to Next Step
+        document.getElementById('next-btn').addEventListener('click', () => {
+            showApiSimulation('Transitioning to Step 2', { info: "Email and phone verified. Proceeding to collect final details." });
+            showScreen('details-screen');
+        });
+        
+        // Step 2: Complete Registration & Trigger Login
+        document.getElementById('complete-reg-btn').addEventListener('click', () => {
+            const fullName = document.getElementById('full-name').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+
+            if (password !== confirmPassword) {
+                alert("Passwords do not match!");
+                return;
+            }
+            
+            registrationState.password = password; // Save the password for auto-login
+
+            showApiSimulation('2. POST /api/auth/complete-registration', {
+                request: { fullName, email: registrationState.email, phoneNumber: registrationState.phoneNumber, emailToken: registrationState.dummyEmailToken, phoneOtp: registrationState.dummyPhoneOtp, password: '***' },
+                response: { statusCode: 201, message: "Registration complete! You can now log in." }
+            });
+            
+            // --- AUTOMATIC LOGIN SIMULATION ---
+            setTimeout(() => {
+                showApiSimulation('3. POST /api/auth/login (Automatic)', {
+                    info: "Frontend automatically logs in the user after successful registration.",
+                    request: { email: registrationState.email, password: '***' },
+                    response: {
+                        statusCode: 200,
+                        message: "Login successful",
+                        data: {
+                            user: { email: registrationState.email },
+                            session: { accessToken: "dummy-final-session-token-" + crypto.randomUUID() }
+                        }
+                    }
+                });
+                
+                // --- SIMULATE SAVING TO LOCALSTORAGE ---
+                try {
+                    localStorage.setItem('user_session', JSON.stringify({
+                        email: registrationState.email,
+                        accessToken: "dummy-final-session-token-" + crypto.randomUUID()
+                    }));
+                    console.log('Simulated saving session to localStorage:', localStorage.getItem('user_session'));
+                } catch (e) {
+                    console.error('Could not simulate saving to localStorage.');
+                }
+
+                showScreen('success-screen');
+            }, 1000); // Small delay to make the simulation clear
+        });
+    </script>
+</body>
+</html>

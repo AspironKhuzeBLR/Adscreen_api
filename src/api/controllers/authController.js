@@ -16,24 +16,56 @@ const generateVerificationToken = (payload) => {
 };
 
 
-// Step 1: Send Phone OTP
 const startPhoneVerification = asyncHandler(async (req, res) => {
     const { phoneNumber } = req.body;
     if (!phoneNumber) throw new ApiError(400, "Phone number is required.");
     
-    await msg91Service.sendSmsOtp(phoneNumber);
+    // 1. Generate OTP
+    const otp = msg91Service.generateOtp();
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min expiry
+
+    // 2. Store the hashed OTP in our database
+    await supabase.from('verifications').insert({
+        identifier: phoneNumber,
+        token_hash: hashedOtp,
+        expires_at: expiresAt.toISOString(),
+        type: 'SMS'
+    });
+
+    // 3. Send the plain OTP via MSG91's /flow endpoint
+    await msg91Service.sendSmsWithOtp(phoneNumber, otp);
     
     res.status(200).json(new ApiResponse(200, null, "OTP sent successfully."));
 });
 
-// Step 2: Verify Phone OTP and get a temporary token
+// Step 2: Verify Phone OTP from our Database
 const verifyPhone = asyncHandler(async (req, res) => {
     const { phoneNumber, otp } = req.body;
     if (!phoneNumber || !otp) throw new ApiError(400, "Phone number and OTP are required.");
 
-    const isVerified = await msg91Service.verifySmsOtp(phoneNumber, otp);
-    if (!isVerified) throw new ApiError(400, "Invalid or expired OTP.");
+    // 1. Find the latest un-used OTP for this number
+    const { data, error } = await supabase
+        .from('verifications')
+        .select('*')
+        .eq('identifier', phoneNumber)
+        .eq('type', 'SMS')
+        .eq('is_used', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+    if (error || !data) throw new ApiError(400, "Invalid OTP. Please request a new one.");
+    if (new Date(data.expires_at) < new Date()) throw new ApiError(400, "OTP has expired.");
 
+    // 2. Compare the provided OTP with the stored hash
+    const isMatch = await bcrypt.compare(otp, data.token_hash);
+    if (!isMatch) throw new ApiError(400, "Invalid OTP provided.");
+
+    // 3. Mark OTP as used to prevent replay attacks
+    await supabase.from('verifications').update({ is_used: true }).eq('id', data.id);
+    
+    // 4. Generate the temporary verification token (JWT)
     const token = generateVerificationToken({ phoneNumber, verified: true, type: 'phone' });
 
     res.status(200).json(new ApiResponse(200, { phoneToken: token }, "Phone number verified successfully."));

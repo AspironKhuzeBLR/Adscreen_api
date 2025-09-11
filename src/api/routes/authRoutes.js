@@ -1,4 +1,3 @@
-// src/api/routes/auth.routes.js
 const { Router } = require('express');
 const authController = require('../controllers/authController');
 

@@ -1,5 +1,4 @@
 
-// src/api/controllers/auth.controller.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -8,7 +7,7 @@ const asyncHandler = require('../../utils/asyncHandler');
 const ApiError = require('../../utils/ApiError');
 const ApiResponse = require('../../utils/ApiResponse');
 const msg91Service = require('../services/msg91Services');
-// --- Helper to generate temporary verification JWTs ---
+
 const generateVerificationToken = (payload) => {
     return jwt.sign(payload, process.env.VERIFICATION_TOKEN_SECRET, {
         expiresIn: process.env.VERIFICATION_TOKEN_EXPIRY || '15m'

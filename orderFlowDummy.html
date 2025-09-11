@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AdScreenHub - Booking Flow Simulation</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f9; margin: 0; padding: 40px; }
+        .container { max-width: 800px; margin: auto; background: #fff; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden; }
+        .screen { padding: 30px; border-bottom: 1px solid #eef; }
+        .screen:last-child { border-bottom: none; }
+        .screen.hidden { display: none; }
+        h2 { color: #333; margin-top: 0; }
+        h3 { color: #555; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #555; font-weight: 500; }
+        input[type="date"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        .card-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.2s; }
+        .card:hover { border-color: #007bff; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+        .card.selected { border-color: #007bff; background-color: #e9f5ff; border-width: 2px; padding: 19px; }
+        .card.disabled { background-color: #f8f9fa; cursor: not-allowed; opacity: 0.6; }
+        .card h4 { margin-top: 0; }
+        .card .price { font-size: 24px; font-weight: bold; color: #007bff; margin: 10px 0; }
+        .availability { font-size: 13px; color: #28a745; background: #e9f8ee; padding: 4px 8px; border-radius: 4px; display: inline-block; }
+        .availability.low { color: #ffc107; background: #fff8e1; }
+        .availability.sold-out { color: #dc3545; background: #fdeeee; }
+        .summary { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        .summary-item { display: flex; justify-content: space-between; padding: 8px 0; font-size: 15px; }
+        .summary-item.total { font-weight: bold; font-size: 18px; color: #333; border-top: 1px solid #ddd; margin-top: 10px; padding-top: 10px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 4px; background-color: #007bff; color: white; font-size: 16px; cursor: pointer; transition: background-color 0.2s; margin-top: 10px; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #a0cffa; cursor: not-allowed; }
+        .api-simulation { font-family: 'Courier New', Courier, monospace; background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 5px; margin-top: 20px; font-size: 13px; white-space: pre-wrap; word-wrap: break-word; }
+        .api-simulation strong { color: #9ae6b4; }
+        .api-simulation .comment { color: #63b3ed; }
+        .error-box { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 4px; margin-top: 20px; text-align: center; }
+        .success-box { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 4px; margin-top: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- SCREEN 1: Date and Location Selection -->
+        <div id="screen-location" class="screen">
+            <h2>1. Select Date & Location</h2>
+            <div class="form-group">
+                <label for="start-date">Select Display Start Date</label>
+                <input type="date" id="start-date">
+            </div>
+            <div id="location-list" class="card-container hidden">
+                <!-- Locations will be dynamically inserted here -->
+            </div>
+            <div id="api-location" class="api-simulation hidden"></div>
+        </div>
+
+        <!-- SCREEN 2: Plan Selection & Summary -->
+        <div id="screen-plan" class="screen hidden">
+            <h2>2. Select Your Plan</h2>
+            <p>You have selected: <strong id="selected-location-name"></strong> starting on <strong id="selected-start-date-text"></strong></p>
+            <div id="plan-list" class="card-container">
+                <!-- Plans will be dynamically inserted here -->
+            </div>
+            <div id="api-plan-check" class="api-simulation hidden"></div>
+
+            <div id="summary-section" class="summary hidden">
+                <h3>Booking Summary</h3>
+                <div class="summary-item"><span>Location:</span> <span id="summary-location"></span></div>
+                <div class="summary-item"><span>Plan:</span> <span id="summary-plan"></span></div>
+                <div class="summary-item"><span>Duration:</span> <span id="summary-duration"></span></div>
+                <div class="summary-item"><span>Dates:</span> <span id="summary-dates"></span></div>
+                <div class="summary-item total"><span>Total:</span> <span id="summary-total"></span></div>
+                <button id="btn-proceed-to-payment">Proceed to Payment</button>
+            </div>
+            <div id="api-initiate" class="api-simulation hidden"></div>
+        </div>
+        
+        <!-- SCREEN 3: Payment Simulation -->
+        <div id="screen-payment" class="screen hidden">
+            <h2>3. Payment Gateway</h2>
+            <p>You are being redirected to Razorpay to complete your payment.</p>
+            <div class="summary">
+                <div class="summary-item"><span>Order ID:</span> <span id="payment-order-id"></span></div>
+                <div class="summary-item total"><span>Amount to Pay:</span> <span id="payment-amount"></span></div>
+            </div>
+            <h3>Simulate Payment Outcome:</h3>
+            <button id="btn-payment-success">Simulate Successful Payment</button>
+            <button id="btn-payment-fail-conflict" style="background-color:#dc3545;">Simulate Success (but another user took the slot)</button>
+             <button id="btn-payment-fail-declined" style="background-color:#ffc107; color: #333;">Simulate Payment Declined</button>
+            <div id="api-verify" class="api-simulation hidden"></div>
+        </div>
+
+        <!-- SCREEN 4: Confirmation / Error -->
+        <div id="screen-confirmation" class="screen hidden">
+             <!-- Content will be dynamically inserted here -->
+        </div>
+
+    </div>
+
+    <script>
+        // --- DATA & STATE SIMULATION ---
+        const MOCK_LOCATIONS = [
+            { id: 1, name: "MG Road LED Screen", total_slots: 5 },
+            { id: 2, name: "Koramangala Billboard", total_slots: 3 },
+            { id: 3, name: "Indiranagar Display", total_slots: 8 },
+        ];
+        const MOCK_PLANS = [
+            { id: 101, name: "Spark", price: 4999, duration: 1 },
+            { id: 102, name: "Impact", price: 13999, duration: 3 },
+            { id: 103, name: "Thrive", price: 22999, duration: 5 },
+        ];
+        const MOCK_INVENTORY = {
+            "2025-09-08": { 1: 5, 2: 2 }, // MG Road sold out, Koramangala has 2 bookings
+            "2025-09-11": { 2: 3 }  // Koramangala sold out
+        };
+        const appState = {
+            startDate: null,
+            selectedLocationId: null,
+            selectedPlanId: null,
+            orderId: null,
+            razorpayOrderId: null
+        };
+
+        // --- DOM ELEMENTS ---
+        const screens = {
+            location: document.getElementById('screen-location'),
+            plan: document.getElementById('screen-plan'),
+            payment: document.getElementById('screen-payment'),
+            confirmation: document.getElementById('screen-confirmation'),
+        };
+        const apiBoxes = {
+            location: document.getElementById('api-location'),
+            planCheck: document.getElementById('api-plan-check'),
+            initiate: document.getElementById('api-initiate'),
+            verify: document.getElementById('api-verify'),
+        };
+
+        // --- UTILITY FUNCTIONS ---
+        function showScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.add('hidden'));
+            screens[screenName].classList.remove('hidden');
+        }
+        function showApi(boxName, title, content) {
+            const box = apiBoxes[boxName];
+            box.innerHTML = `<strong>${title}</strong><br><span class="comment">// Backend Action</span><br>${JSON.stringify(content, null, 2)}`;
+            box.classList.remove('hidden');
+        }
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+        function addDays(date, days) {
+            const result = new Date(date);
+            result.setDate(result.getDate() + days);
+            return result;
+        }
+
+        // --- LOGIC FUNCTIONS ---
+        function handleDateChange(e) {
+            appState.startDate = new Date(e.target.value);
+            const dateString = formatDate(appState.startDate);
+            
+            showApi('location', 'GET /api/v1/data/locations/availability', { query: { date: dateString } });
+            
+            const inventoryForDate = MOCK_INVENTORY[dateString] || {};
+            const locationList = document.getElementById('location-list');
+            locationList.innerHTML = '';
+
+            MOCK_LOCATIONS.forEach(loc => {
+                const booked = inventoryForDate[loc.id] || 0;
+                const available = loc.total_slots - booked;
+                let availabilityHtml;
+                let statusClass = '';
+                if (available <= 0) {
+                    availabilityHtml = `<div class="availability sold-out">Sold Out</div>`;
+                    statusClass = 'disabled';
+                } else if (available < 3) {
+                     availabilityHtml = `<div class="availability low">${available} slots available</div>`;
+                } else {
+                     availabilityHtml = `<div class="availability">${available} slots available</div>`;
+                }
+                
+                locationList.innerHTML += `
+                    <div class="card location-card ${statusClass}" data-id="${loc.id}" onclick="selectLocation(${loc.id}, '${statusClass}')">
+                        <h4>${loc.name}</h4>
+                        ${availabilityHtml}
+                    </div>
+                `;
+            });
+            locationList.classList.remove('hidden');
+        }
+
+        function selectLocation(id, statusClass) {
+            if (statusClass === 'disabled') return;
+            appState.selectedLocationId = id;
+            document.querySelectorAll('.location-card').forEach(c => c.classList.remove('selected'));
+            document.querySelector(`.location-card[data-id="${id}"]`).classList.add('selected');
+            
+            // Populate and show next screen
+            const loc = MOCK_LOCATIONS.find(l => l.id === id);
+            document.getElementById('selected-location-name').innerText = loc.name;
+            document.getElementById('selected-start-date-text').innerText = formatDate(appState.startDate);
+            renderPlans();
+            showScreen('plan');
+        }
+
+        function renderPlans() {
+            const planList = document.getElementById('plan-list');
+            planList.innerHTML = '';
+            MOCK_PLANS.forEach(p => {
+                 planList.innerHTML += `
+                    <div class="card plan-card" data-id="${p.id}" onclick="selectPlan(${p.id})">
+                        <h4>${p.name}</h4>
+                        <div class="price">₹${p.price.toLocaleString('en-IN')}</div>
+                        <p>${p.duration} day${p.duration > 1 ? 's' : ''}</p>
+                    </div>
+                `;
+            });
+        }
+        
+        function selectPlan(id) {
+            appState.selectedPlanId = id;
+            document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+            document.querySelector(`.plan-card[data-id="${id}"]`).classList.add('selected');
+
+            const plan = MOCK_PLANS.find(p => p.id === id);
+            const dateRange = Array.from({length: plan.duration}, (_, i) => formatDate(addDays(appState.startDate, i)));
+            
+            // Simulate API check for entire range
+            showApi('planCheck', 'GET /api/v1/locations/:id/check-availability', { query: { startDate: dateRange[0], planId: id } });
+
+            let isRangeAvailable = true;
+            dateRange.forEach(date => {
+                const inventoryForDate = MOCK_INVENTORY[date] || {};
+                const loc = MOCK_LOCATIONS.find(l => l.id === appState.selectedLocationId);
+                const booked = inventoryForDate[loc.id] || 0;
+                if (loc.total_slots - booked <= 0) {
+                    isRangeAvailable = false;
+                }
+            });
+            
+            if (!isRangeAvailable) {
+                apiBoxes.planCheck.innerHTML += `<div class="error-box" style="margin-top:10px;">API Response: { "is_available": false }</div>`;
+                document.getElementById('summary-section').classList.add('hidden');
+                alert(`Error: This location is sold out for one or more days in the selected ${plan.duration}-day range. Please choose a different start date or plan.`);
+                return;
+            } else {
+                apiBoxes.planCheck.innerHTML += `<div class="success-box" style="margin-top:10px;">API Response: { "is_available": true }</div>`;
+            }
+
+            // Populate summary
+            const loc = MOCK_LOCATIONS.find(l => l.id === appState.selectedLocationId);
+            const endDate = addDays(appState.startDate, plan.duration - 1);
+            document.getElementById('summary-location').innerText = loc.name;
+            document.getElementById('summary-plan').innerText = plan.name;
+            document.getElementById('summary-duration').innerText = `${plan.duration} day${plan.duration > 1 ? 's' : ''}`;
+            document.getElementById('summary-dates').innerText = `${formatDate(appState.startDate)} to ${formatDate(endDate)}`;
+            document.getElementById('summary-total').innerText = `₹${plan.price.toLocaleString('en-IN')}`;
+            document.getElementById('summary-section').classList.remove('hidden');
+        }
+
+        function proceedToPayment() {
+            const plan = MOCK_PLANS.find(p => p.id === appState.selectedPlanId);
+            appState.orderId = 'ORD' + Date.now();
+            appState.razorpayOrderId = 'order_' + Math.random().toString(36).substr(2, 9);
+            
+            showApi('initiate', 'POST /api/v1/orders/initiate', {
+                body: {
+                    locationId: appState.selectedLocationId,
+                    planId: appState.selectedPlanId,
+                    startDate: formatDate(appState.startDate)
+                },
+                response: {
+                    orderId: appState.orderId,
+                    razorpayOrderId: appState.razorpayOrderId
+                },
+                comment: "// Slot is NOT booked yet. Only an order record with 'Pending Payment' status is created."
+            });
+            
+            document.getElementById('payment-order-id').innerText = appState.orderId;
+            document.getElementById('payment-amount').innerText = `₹${plan.price.toLocaleString('en-IN')}`;
+            showScreen('payment');
+        }
+
+        function handlePaymentSuccess() {
+             showApi('verify', 'POST /api/v1/orders/verify-payment', {
+                body: {
+                    orderId: appState.orderId,
+                    razorpay_payment_id: "pay_" + Math.random().toString(36).substr(2, 9)
+                },
+                comment: "// Backend verifies payment signature, then performs ATOMIC transaction: 1. LOCK inventory rows. 2. RE-CHECK availability. 3. UPDATE inventory. 4. UPDATE order status to 'Pending Approval'. 5. COMMIT."
+            });
+
+            screens.confirmation.innerHTML = `
+                <div class="success-box">
+                    <h2>Booking Confirmed!</h2>
+                    <p>Your order <strong>${appState.orderId}</strong> has been placed successfully.</p>
+                    <p>Status: Pending Approval</p>
+                </div>
+                <div id="api-verify" class="api-simulation">... (See above) ...</div>
+            `;
+            showScreen('confirmation');
+        }
+        
+        function handlePaymentConflict() {
+             showApi('verify', 'POST /api/v1/orders/verify-payment', {
+                body: { orderId: appState.orderId, /*...*/ },
+                comment: "// Payment signature is VALID. Backend begins ATOMIC transaction...",
+                "DB Transaction Fails": "Another user booked the last slot. The final inventory check fails. Transaction is ROLLED BACK.",
+                "Backend Final Actions": [
+                    "Calls Razorpay API to automatically refund the payment.",
+                    "Updates order status to 'Cancelled (Inventory Conflict)'.",
+                    "Returns 409 Conflict error to frontend."
+                ]
+            });
+
+             screens.confirmation.innerHTML = `
+                <div class="error-box">
+                    <h2>Booking Failed</h2>
+                    <p>We're sorry, the selected slot was booked by another user while you were completing payment.</p>
+                    <p><strong>Your payment has been automatically refunded.</strong></p>
+                    <p>Please try booking again.</p>
+                </div>
+                <div id="api-verify" class="api-simulation">... (See above) ...</div>
+            `;
+            showScreen('confirmation');
+        }
+
+        function handlePaymentDeclined() {
+            showApi('initiate', 'POST /api/v1/orders/initiate (Recap)', {
+                comment: "// The 'Pending Payment' order record (ID: "+ appState.orderId +") remains in the database. Inventory was NOT affected. A cleanup job will mark this order as 'Expired' after 30 minutes."
+            });
+            screens.confirmation.innerHTML = `
+                <div class="error-box">
+                    <h2>Payment Declined</h2>
+                    <p>Your payment was not successful. Your booking has not been confirmed.</p>
+                    <p>You can try the payment again or start a new booking.</p>
+                </div>
+                 <div id="api-verify" class="api-simulation">... (See recap above) ...</div>
+            `;
+            showScreen('confirmation');
+        }
+
+
+        // --- EVENT LISTENERS ---
+        document.getElementById('start-date').addEventListener('change', handleDateChange);
+        document.getElementById('btn-proceed-to-payment').addEventListener('click', proceedToPayment);
+        document.getElementById('btn-payment-success').addEventListener('click', handlePaymentSuccess);
+        document.getElementById('btn-payment-fail-conflict').addEventListener('click', handlePaymentConflict);
+        document.getElementById('btn-payment-fail-declined').addEventListener('click', handlePaymentDeclined);
+        
+        // --- INITIALIZATION ---
+        showScreen('location');
+
+    </script>
+</body>
+</html>

@@ -4,6 +4,8 @@ const cors = require('cors');
 const errorHandler = require('./src/api/middleware/errorHandler'); 
 
 const authRoutes = require('./src/api/routes/authRoutes');
+const dataRouter = require('./src/api/routes/dataRoutes');
+const orderRouter = require('./src/api/routes/orderRoutes'); // 
 
 const app = express();
 const port = process.env.PORT || 8000;
@@ -37,7 +39,6 @@ app.get('/test/auth', asyncHandler(async (req, res) => {
 
     res.status(200).json(new ApiResponse(200, data, "Full user profile fetched successfully."));
 }));
-// --- NEW TEST ROUTE TO UPDATE A PHONE NUMBER ---
 app.get('/test/ ', asyncHandler(async (req, res) => {
     // Hardcode the user ID and the new phone number for this test
     const userIdToUpdate = 'a553e5a7-a623-412d-84f6-86e69ec5f757'; // <<< The user you want to change
@@ -75,9 +76,8 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/v1/auth', authRoutes);
-
-
-
+app.use('/api/v1/data', dataRouter); 
+app.use('/api/v1/order',orderRouter);
 
 app.use(errorHandler);
 

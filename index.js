@@ -5,10 +5,12 @@ const errorHandler = require('./src/api/middleware/errorHandler');
 
 const authRoutes = require('./src/api/routes/authRoutes');
 const dataRouter = require('./src/api/routes/dataRoutes');
-const orderRouter = require('./src/api/routes/orderRoutes'); // 
+const orderRouter = require('./src/api/routes/orderRoutes');  
+const fileRouter = require('./src/api/routes/filesRoutes'); 
 
 const app = express();
 const port = process.env.PORT || 8000;
+
 app.use(cors());
 app.use(express.json());
 
@@ -16,6 +18,7 @@ const supabase = require('./src/config/supabase');
 const asyncHandler = require('./src/utils/asyncHandler');
 const ApiError = require('./src/utils/ApiError');
 const ApiResponse = require('./src/utils/ApiResponse');
+const { file } = require('zod');
 
 app.get('/test/auth', asyncHandler(async (req, res) => {
     const userId = 'a553e5a7-a623-412d-84f6-86e69ec5f757';
@@ -66,7 +69,6 @@ app.get('/test/ ', asyncHandler(async (req, res) => {
 
     res.status(200).json(new ApiResponse(200, { updatedUser: data.user }, responseMessage));
 }));
-
 app.get('/', (req, res) => {
   res.json({ 
     message: 'AdScreen Hub Backend API is running!',
@@ -77,7 +79,8 @@ app.get('/', (req, res) => {
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/data', dataRouter); 
-app.use('/api/v1/order',orderRouter);
+app.use('/api/v1/orders',orderRouter);
+app.use('/api/v1/files', fileRouter); 
 
 app.use(errorHandler);
 

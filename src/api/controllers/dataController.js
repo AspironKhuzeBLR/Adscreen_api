@@ -44,8 +44,7 @@ const getLocationsWithAvailability = asyncHandler(async (req, res) => {
       )
     );
 });
-// src/api/controllers/data.controller.js
-// ... (add to existing file)
+
 const checkPlanAvailability = asyncHandler(async (req, res) => {
   const { locationId } = req.params;
   const { startDate, planId } = req.query;
@@ -57,7 +56,6 @@ const checkPlanAvailability = asyncHandler(async (req, res) => {
     );
   }
 
-  // Get plan duration
   const { data: plan, error: planError } = await supabase
     .from("plans")
     .select("duration_days")
@@ -74,8 +72,12 @@ const checkPlanAvailability = asyncHandler(async (req, res) => {
       p_duration_days: plan.duration_days,
     }
   );
+  console.log("Availability Check:", { locationId, startDate, planId, isAvailable });
 
-  if (rpcError) throw new ApiError(500, "Error checking availability.");
+  if (rpcError) {
+    console.error("Supabase RPC Error:", rpcError);
+    throw new ApiError(500, "Error checking availability.");
+  }
 
   res
     .status(200)

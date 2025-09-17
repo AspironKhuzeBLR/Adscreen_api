@@ -10,7 +10,6 @@ const protect = asyncHandler(async (req, res, next) => {
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         token = req.headers.authorization.split(' ')[1];
     }
-    console.log("Token:", token);
 
     if (!token) {
         throw new ApiError(401, "Not authorized, no token provided.");
@@ -36,7 +35,6 @@ const protect = asyncHandler(async (req, res, next) => {
       ...user,
       profile: profile || null
     };
-    console.log("Authenticated user:", req.user);
     next();
   } catch (error) {
     return next(new ApiError(401, 'Token verification failed'));

@@ -80,20 +80,23 @@ const verifyPhone = asyncHandler(async (req, res) => {
 const startEmailVerification = asyncHandler(async (req, res) => {
     const { email } = req.body;
     if (!email) throw new ApiError(400, "Email is required.");
-     const lowercasedEmail = email.toLowerCase();
-
     
-    const { data: { users }, error: userError } = await supabase.auth.admin.listUsers({
-        email: lowercasedEmail,
-    });
-
-    if (userError) {
-        throw new ApiError(500, "Something went wrong while checking for existing user.", userError);
-    }
     
-    if (users && users.length > 0) {
-        throw new ApiError(409, "An account with this email address already exists."); 
-    }
+    const lowercasedEmail = email.toLowerCase();
+
+    // const { data: { user }, error } =  await supabase
+    //     .from('profiles')
+    //     .select('email')
+    //     .eq('email', lowercasedEmail)
+    //     .single(); 
+
+    // if (error) {
+    //     throw new ApiError(500, "Something went wrong while checking for existing user.", error);
+    // }
+    // console.log(user);
+    // if (user) {
+    //     throw new ApiError(409, "An account with this email address already exists."); 
+    // }
 
     const selector = crypto.randomBytes(16).toString('hex');
     const validator = crypto.randomBytes(32).toString('hex');

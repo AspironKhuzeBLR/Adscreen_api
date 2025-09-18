@@ -1,4 +1,4 @@
-const axios = require('axios');
+    const axios = require('axios');
 const ApiError = require('../../utils/ApiError');
 const AUTH_KEY = process.env.MSG91_AUTH_KEY;
 const PHONE_TPL_ID = process.env.MSG91_PHONE_VERIFICATION_TPL_ID;
@@ -84,16 +84,26 @@ const sendEmailVerificationLink = async (email, customerName, verificationLink) 
     return sendEmail(EMAIL_VERIFY_TPL_ID, email, variables);
 };
 
-const sendPasswordResetEmail = async (email, customerName, otp) => {
+
+// NEW: Function to send a password reset OTP, as per your request
+const sendPasswordResetOtp = async (email, customerName, otp) => {
     const variables = { CUSTOMER_NAME: customerName, OTP: otp };
-    console.log(`[DEV-ONLY] Password Reset OTP for ${email}: ${otp}`);
     return sendEmail(PASSWORD_RESET_TPL_ID, email, variables);
 };
 
+// NEW: Function to send a password reset link (as requested, though not used in the OTP flow)
+const sendPasswordResetLink = async (email, customerName, resetLink) => {
+    // Assumes you have a different template ID for a link-based reset
+    // and a variable named RESET_LINK in that template.
+    const LINK_BASED_RESET_TPL_ID = process.env.MSG91_PASSWORD_RESET_LINK_TPL_ID;
+    const variables = { CUSTOMER_NAME: customerName, RESET_LINK: resetLink };
+    return sendEmail(LINK_BASED_RESET_TPL_ID, email, variables);
+};
 module.exports = {
     generateOtp,
     sendSmsWithOtp,
     verifySmsOtp,
     sendEmailVerificationLink,
-    sendPasswordResetEmail,
+    sendPasswordResetOtp,
+    sendPasswordResetLink,
 };

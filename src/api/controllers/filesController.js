@@ -31,8 +31,7 @@ const createSignedUploadUrl = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Could not create signed upload URL.", error);
     }
 
-    // The 'path' returned here is what the frontend needs to send back
-    // during order initiation. The 'token' and 'url' are used for the upload.
+   
     res.status(200).json(new ApiResponse(200, data, "Signed URL created successfully."));
 });
 

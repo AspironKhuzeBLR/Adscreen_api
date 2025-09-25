@@ -13,7 +13,6 @@ const generateVerificationToken = (payload) => {
     });
 };
 
-// --- Existing Phone Verification Endpoints ---
 
 const startPhoneVerification = asyncHandler(async (req, res) => {
     const { phoneNumber } = req.body;
@@ -35,9 +34,8 @@ const startPhoneVerification = asyncHandler(async (req, res) => {
 
     const otp = msg91Service.generateOtp();
     const hashedOtp = await bcrypt.hash(otp, 10);
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min expiry
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); 
 
-    // Invalidate old OTPs
     await supabase.from('verifications')
       .update({ is_used: true })
       .eq('identifier', phoneNumber)
@@ -159,15 +157,12 @@ const verifyEmail = asyncHandler(async (req, res) => {
     res.status(200).json(new ApiResponse(200, { emailToken: verificationJwt }, "Email verified successfully."));
 });
 
-// --- NEW: Resend Endpoints ---
 
 const resendOtp = asyncHandler(async (req, res) => {
     const { phoneNumber } = req.body;
     if (!phoneNumber) throw new ApiError(400, "Phone number is required.");
 
-    // Optional: Check if a user with this phone number already exists in registration process
-    // This logic depends on whether you allow resending OTP for numbers not in the 'verifications' table
-    
+
     await startPhoneVerification(req, res); // Reuse the start phone verification logic
 });
 
@@ -179,14 +174,12 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
 });
 
 
-// --- NEW: Password Management Endpoints ---
 const forgotPassword = asyncHandler(async (req, res) => {
     const { email } = req.body;
     if (!email) throw new ApiError(400, "Email is required.");
 
     const lowercasedEmail = email.toLowerCase();
     
-    // Step 1: Check if a user with this email exists
     const { data: profile, error } = await supabase
         .from('profiles')
         .select('id, full_name') // fetch full_name for the email template
@@ -209,7 +202,6 @@ const forgotPassword = asyncHandler(async (req, res) => {
     const hashedOtp = await bcrypt.hash(otp, 10);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10-minute expiry as per template
 
-    // Step 4: Store the hashed OTP in the database
     await supabase.from('verifications').insert({
         identifier: lowercasedEmail,
         validator_hash: hashedOtp, // Storing hashed OTP here
@@ -218,7 +210,6 @@ const forgotPassword = asyncHandler(async (req, res) => {
         // 'selector' is no longer needed for OTP flow
     });
 
-    // Step 5: Send the OTP to the user's email
     await msg91Service.sendPasswordResetOtp(lowercasedEmail, profile.full_name || "Valued User", otp);
 
     res.status(200).json(new ApiResponse(200, null, "If an account with this email exists, a password reset code has been sent."));
@@ -232,7 +223,6 @@ const resetPassword = asyncHandler(async (req, res) => {
     
     const lowercasedEmail = email.toLowerCase();
     
-    // Step 1: Find the latest, unused OTP for this email
     const { data: verificationRecord, error } = await supabase
         .from('verifications')
         .select('*')
@@ -246,11 +236,9 @@ const resetPassword = asyncHandler(async (req, res) => {
     if (error || !verificationRecord) throw new ApiError(400, "Invalid OTP. Please request a new one.");
     if (new Date(verificationRecord.expires_at) < new Date()) throw new ApiError(400, "OTP has expired. Please request a new one.");
 
-    // Step 2: Compare the provided OTP with the hashed OTP from the database
     const isTokenValid = await bcrypt.compare(otp, verificationRecord.validator_hash);
     if (!isTokenValid) throw new ApiError(400, "Invalid OTP provided.");
 
-    // Step 3: Get the user's ID associated with the email
     const { data: user, error: userError } = await supabase
       .from('profiles')
       .select('id')
@@ -261,7 +249,6 @@ const resetPassword = asyncHandler(async (req, res) => {
       throw new ApiError(404, "User associated with this reset request not found.");
     }
 
-    // Step 4: Update the user's password in Supabase Auth
     const { error: updateError } = await supabase.auth.admin.updateUserById(
         user.id,
         { password: password }
@@ -271,7 +258,6 @@ const resetPassword = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Failed to update password.", updateError);
     }
     
-    // Step 5: Invalidate the OTP record after successful use
     await supabase.from('verifications').update({ is_used: true }).eq('id', verificationRecord.id);
 
     res.status(200).json(new ApiResponse(200, null, "Password has been reset successfully."));
@@ -279,7 +265,6 @@ const resetPassword = asyncHandler(async (req, res) => {
 
 
 
-// --- Registration and Session Management ---
 
 const completeRegistration = asyncHandler(async (req, res) => {
     const { fullName, password, phoneToken, emailToken } = req.body;
@@ -340,9 +325,7 @@ const login = asyncHandler(async (req, res) => {
 });
 
 const signOut = asyncHandler(async (req, res) => {
-    // Supabase handles session invalidation via its client-side libraries.
-    // This server-side endpoint is for explicitly signing out, perhaps to blacklist a token if using a custom JWT solution.
-    // With Supabase's default setup, this server-side call confirms the sign-out.
+    
     const { error } = await supabase.auth.signOut();
 
     if (error) {
@@ -354,8 +337,7 @@ const signOut = asyncHandler(async (req, res) => {
 
 const deleteAccount = asyncHandler(async (req, res) => {
     const { password } = req.body;
-    const userId = req.user.id; // Assuming authMiddleware attaches the user object to req
-    console.log(password, userId);
+    const userId = req.user.id; 
     if (!password) {
         throw new ApiError(400, "Password is required to confirm account deletion.");
     }
@@ -363,9 +345,7 @@ const deleteAccount = asyncHandler(async (req, res) => {
         throw new ApiError(401, "User not authenticated.");
     }
 
-    // Step 1: Fetch user's email to verify their password
-    // We can't use supabase.auth.getUser() with the user's JWT on the server-side in this context
-    // So we fetch the profile to get the email.
+  
     const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('email')
@@ -376,7 +356,6 @@ const deleteAccount = asyncHandler(async (req, res) => {
         throw new ApiError(404, "User profile not found.");
     }
 
-    // Step 2: Verify the user's password
     const { error: signInError } = await supabase.auth.signInWithPassword({
         email: profile.email,
         password: password,
@@ -386,31 +365,24 @@ const deleteAccount = asyncHandler(async (req, res) => {
         throw new ApiError(401, "Invalid password. Account deletion failed.", signInError);
     }
 
-    // Step 3: Delete the user's profile data from the 'profiles' table.
-    // It's often better to delete dependent data *before* deleting the auth user.
     const { error: deleteProfileError } = await supabase
         .from('profiles')
         .delete()
         .eq('id', userId);
 
     if (deleteProfileError) {
-        // If this fails, we stop the process to avoid leaving an auth user without a profile.
         console.error("Failed to delete user profile, aborting account deletion:", deleteProfileError);
         throw new ApiError(500, "Could not delete user profile. Please try again.", deleteProfileError);
     }
 
-    // Step 4: Delete the user from Supabase Auth. This is the final, irreversible step.
     const { error: deleteAuthUserError } = await supabase.auth.admin.deleteUser(userId);
 
     if (deleteAuthUserError) {
-        // This is a critical error. The profile was deleted but the auth user wasn't.
-        // This situation should be logged for manual admin intervention.
+      
         console.error(`CRITICAL: User profile ${userId} was deleted but failed to delete auth user.`, deleteAuthUserError);
-        // We inform the user that something went wrong.
         throw new ApiError(500, "Failed to completely delete user account. Please contact support.", deleteAuthUserError);
     }
     
-    // Step 5: Send a final success response.
     res.status(200).json(new ApiResponse(200, null, "Your account has been permanently deleted."));
 });
 

@@ -9,6 +9,6 @@ const router = Router();
 router.use(protect);
 
 // This route will be used to get a secure URL for uploading a new creative.
-router.post('/upload-url', createSignedUploadUrl);
+router.post('/signed-upload-url', createSignedUploadUrl);
 
 module.exports = router;

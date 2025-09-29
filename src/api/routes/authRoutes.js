@@ -24,6 +24,23 @@ router.post('/reset-password', authController.resetPassword);
 router.post('/login', authController.login);
 
 router.post('/signout', protect, authController.signOut);
+
+// --- General Profile Data ---
+router.get('/profile', protect, authController.getMyProfile);
+router.patch('/profile', protect, authController.updateProfileDetails); // For fullName, gstInfo
+
+// --- Password Update ---
+router.post('/profile/update-password', protect, authController.updatePassword);
+
+// --- Email Update Flow ---
+router.post('/start-email-update', protect, authController.startEmailUpdate);
+router.post('/complete-email-update', protect, authController.completeEmailUpdate);
+
+// --- Phone Number Update Flow ---
+router.post('/start-phone-update', protect, authController.startPhoneUpdate);
+router.post('/complete-phone-update', protect, authController.completePhoneUpdate);
+
 router.delete('/delete-account', protect, authController.deleteAccount);
+
 
 module.exports = router;

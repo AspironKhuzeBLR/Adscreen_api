@@ -460,7 +460,6 @@ const signOut = asyncHandler(async (req, res) => {
 
 const getMyProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  console.log(userId);
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("email, full_name, phone_number, gst_info, user_role")

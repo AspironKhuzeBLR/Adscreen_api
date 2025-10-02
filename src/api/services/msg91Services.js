@@ -131,6 +131,63 @@ const sendPasswordResetLink = async (email, customerName, resetLink) => {
     const variables = { CUSTOMER_NAME: customerName, RESET_LINK: resetLink };
     return sendEmail(LINK_BASED_RESET_TPL_ID, email, variables);
 };
+const sendOrderConfirmationEmail = async (orderDetails, recipientEmail, customerName) => {
+    // IMPORTANT: Add this new template ID to your .env file
+    const ORDER_CONFIRM_TPL_ID = process.env.MSG91_ORDER_CONFIRMATION_TPL_ID;
+
+    // Construct the order link for the email button
+    const orderLink = `${process.env.CLIENT_URL}/orders/${orderDetails.order_uid}`; // Assuming you have a unique order_uid
+
+    // Map the order details to the variables in your MSG91 template
+    const variables = {
+        CUSTOMER_NAME: customerName,
+        ORDER_ID: orderDetails.order_uid || orderDetails.id, // Use a user-friendly UID if available
+        start_date: new Date(orderDetails.start_date).toLocaleDateString('en-GB'), // Format date nicely
+        location_name: orderDetails.location_name,
+        plan_name: orderDetails.plan_name,
+        gross_amount: orderDetails.final_amount || orderDetails.total_cost, // Use final_amount if it exists
+        ORDER_LINK: orderLink,
+    };
+
+    console.log(`Sending order confirmation for order ID ${orderDetails.id} to ${recipientEmail}`);
+    return sendEmail(ORDER_CONFIRM_TPL_ID, recipientEmail, variables);
+};
+
+
+const sendContactUserConfirmationEmail = async (recipientEmail, formData) => {
+    const CONTACT_USER_CONFIRM_TPL_ID = process.env.MSG91_CONTACT_USER_CONFIRM_TPL_ID;
+
+    const variables = {
+        user_name: formData.fullName,
+        user_email: formData.email,
+        user_phone: formData.phoneNumber,
+        user_message: formData.message,
+    };
+
+    console.log(`Sending contact form confirmation to user: ${recipientEmail}`);
+    return sendEmail(CONTACT_USER_CONFIRM_TPL_ID, recipientEmail, variables);
+};
+
+
+const sendContactAdminNotificationEmail = async (formData) => {
+    const CONTACT_ADMIN_NOTIFY_TPL_ID = process.env.MSG91_CONTACT_ADMIN_NOTIFY_TPL_ID;
+    const ADMIN_EMAIL = process.env.ADMIN_CONTACT_EMAIL; // Admin's email, e.g., info@adscreenhub.com
+
+    if (!ADMIN_EMAIL) {
+        console.error('ADMIN_CONTACT_EMAIL is not set in environment variables. Admin notification email cannot be sent.');
+        return false;
+    }
+
+    const variables = {
+        user_name: formData.fullName,
+        user_email: formData.email,
+        user_phone: formData.phoneNumber,
+        user_message: formData.message,
+    };
+
+    console.log(`Sending new contact form notification to admin: ${ADMIN_EMAIL}`);
+    return sendEmail(CONTACT_ADMIN_NOTIFY_TPL_ID, ADMIN_EMAIL, variables);
+};
 module.exports = {
     generateOtp,
     sendSmsWithOtp,
@@ -139,5 +196,8 @@ module.exports = {
     sendEmailVerificationLink,
     sendPasswordResetOtp,
     sendPasswordResetLink,
-    sendEmailUpdateOtp
+    sendEmailUpdateOtp,
+    sendOrderConfirmationEmail,
+    sendContactUserConfirmationEmail,
+    sendContactAdminNotificationEmail
 };

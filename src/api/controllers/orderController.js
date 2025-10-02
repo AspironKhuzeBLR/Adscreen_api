@@ -4,6 +4,8 @@ const supabase = require("../../config/supabase");
 const asyncHandler = require("../../utils/asyncHandler");
 const ApiError = require("../../utils/ApiError");
 const ApiResponse = require("../../utils/ApiResponse");
+const msg91Service = require("../services/msg91Services");
+
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -76,6 +78,12 @@ const initiateOrder = asyncHandler(async (req, res) => {
         notes: { userId, planId, locationId }
     });
 
+    const { data: urlData } = supabase.storage
+    .from('ad-creatives')
+    .getPublicUrl(creativeFilePath);
+
+    const publicUrl = urlData.publicUrl;
+
     // 6. CREATE the order record in our database (no change here, but uses the new dynamic price)
     const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
         user_id: userId,
@@ -89,20 +97,22 @@ const initiateOrder = asyncHandler(async (req, res) => {
         gst_info: gstInfo,
         status: 'Pending Payment',
         order_uid: orderUID,
-        razorpay_order_id: rpOrder.id
+        razorpay_order_id: rpOrder.id,
+        creative_image_url: publicUrl
     }).select().single();
     
     if (orderError) {
         throw new ApiError(500, "Could not create the initial order record.", orderError);
     }
     
-    // 7. LINK the creative (no change here)
+    
     const { error: creativeError } = await supabase.from('creatives').insert({
         order_id: newOrder.id,
         user_id: userId,
         file_path: creativeFilePath,
         file_name: creativeFileName,
-        doc_type: 'design'
+        doc_type: 'design',
+        image_url: publicUrl,
     });
 
     if (creativeError) {
@@ -183,11 +193,9 @@ const verifyPayment = asyncHandler(async (req, res) => {
     // 3. Handle the RPC Result
     switch (rpcResult) {
         case 'SUCCESS':
-            await supabase.from('orders').update({
-                razorpay_payment_id,
-                razorpay_signature,
-                status: 'Pending Approval'
-            }).eq('id', orderId);
+           
+            await handleSuccessfulPayment({ orderId, razorpay_payment_id, razorpay_signature });
+
             return res.status(200).json(new ApiResponse(200, { orderId, status: 'Pending Approval' }, "Payment successful and booking confirmed!"));
 
         case 'SLOT_UNAVAILABLE':
@@ -220,8 +228,51 @@ const verifyPayment = asyncHandler(async (req, res) => {
             throw new ApiError(500, "A critical server error occurred while confirming your booking. Please contact support immediately.");
     }
 });
+const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_signature }) => {
+    // 1. Update the order status and payment details
+    await supabase.from('orders').update({
+        razorpay_payment_id,
+        razorpay_signature,
+        status: 'Pending Approval'
+    }).eq('id', orderId);
 
-// In src/api/controllers/orderController.js
+    // 2. Fetch the complete order data needed for the email
+    // We need to join with other tables to get all the names.
+    const { data: fullOrderDetails, error: detailsError } = await supabase
+        .from('orders')
+        .select(`
+            *,
+            profiles ( full_name, email ),
+            locations ( name ),
+            plans ( name )
+        `)
+        .eq('id', orderId)
+        .single();
+
+    if (detailsError || !fullOrderDetails) {
+
+        console.error(`CRITICAL: Failed to fetch details for order ${orderId} after successful payment. Email not sent.`, detailsError);
+        return; 
+    }
+
+    try {
+        const orderDataForEmail = {
+            ...fullOrderDetails,
+            location_name: fullOrderDetails.locations.name,
+            plan_name: fullOrderDetails.plans.name
+        };
+        
+        await msg91Service.sendOrderConfirmationEmail(
+            orderDataForEmail,
+            fullOrderDetails.profiles.email,
+            fullOrderDetails.profiles.full_name
+        );
+    } catch (emailError) {
+        // IMPORTANT: If the email fails, we don't want to fail the whole transaction.
+        // The user's payment was successful. We just log the email error and move on.
+        console.error(`Email failed to send for successfully paid order ${orderId}:`, emailError);
+    }
+};
 
 const getUserOrders = asyncHandler(async (req, res) => {
     const userId = req.user.id;
@@ -250,32 +301,32 @@ const getUserOrders = asyncHandler(async (req, res) => {
 
     // Step 2: Generate signed URLs for each creative's file_path.
     // We use Promise.all for performance, generating all URLs concurrently.
-    const ordersWithSignedUrls = await Promise.all(
-        orders.map(async (order) => {
-            // The result from the query might be an array of creatives, but we assume one creative per order for now.
-            const creative = order.creatives[0];
+    // const ordersWithSignedUrls = await Promise.all(
+    //     orders.map(async (order) => {
+    //         // The result from the query might be an array of creatives, but we assume one creative per order for now.
+    //         const creative = order.creatives[0];
             
-            if (creative && creative.file_path) {
-                // Generate a signed URL that is valid for a limited time (e.g., 1 hour).
-                const { data: signedUrlData, error: urlError } = await supabase
-                    .storage
-                    .from('ad-creatives') // Make sure this is your bucket name
-                    .createSignedUrl(creative.file_path, 3600); // 3600 seconds = 1 hour
+    //         if (creative && creative.file_path) {
+    //             // Generate a signed URL that is valid for a limited time (e.g., 1 hour).
+    //             const { data: signedUrlData, error: urlError } = await supabase
+    //                 .storage
+    //                 .from('ad-creatives') // Make sure this is your bucket name
+    //                 .createSignedUrl(creative.file_path, 3600); // 3600 seconds = 1 hour
 
-                if (urlError) {
-                    console.error(`Could not create signed URL for path: ${creative.file_path}`, urlError);
-                    // If URL generation fails, we can still return the order without the image URL.
-                    creative.publicUrl = null; 
-                } else {
-                    creative.publicUrl = signedUrlData.signedUrl;
-                }
-            }
+    //             if (urlError) {
+    //                 console.error(`Could not create signed URL for path: ${creative.file_path}`, urlError);
+    //                 // If URL generation fails, we can still return the order without the image URL.
+    //                 creative.publicUrl = null; 
+    //             } else {
+    //                 creative.publicUrl = signedUrlData.signedUrl;
+    //             }
+    //         }
             
-            return order;
-        })
-    );
+    //         return order;
+    //     })
+    // );
 
-    res.status(200).json(new ApiResponse(200, ordersWithSignedUrls, "User orders retrieved successfully."));
+    res.status(200).json(new ApiResponse(200, orders, "User orders retrieved successfully."));
 });
 
 module.exports = { initiateOrder, verifyPayment, getUserOrders };

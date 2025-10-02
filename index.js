@@ -7,7 +7,7 @@ const authRoutes = require('./src/api/routes/authRoutes');
 const dataRouter = require('./src/api/routes/dataRoutes');
 const orderRouter = require('./src/api/routes/orderRoutes');  
 const fileRouter = require('./src/api/routes/filesRoutes'); 
-
+const contactRoutes = require('./src/api/routes/contactRoutes'); // NEW: Import your contact routes
 const app = express();
 const port = process.env.PORT || 8000;
 
@@ -81,6 +81,8 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/data', dataRouter); 
 app.use('/api/v1/orders',orderRouter);
 app.use('/api/v1/files', fileRouter); 
+app.use('/api/v1/contact', contactRoutes); // NEW: Add your contact routes here
+
 
 app.use(errorHandler);
 

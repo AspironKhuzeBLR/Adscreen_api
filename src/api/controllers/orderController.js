@@ -12,17 +12,15 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// In src/api/controllers/orderController.js
 
 const initiateOrder = asyncHandler(async (req, res) => {
     const { nanoid } = await import('nanoid');
 
-    // 1. DESTRUCTURE required data. Note the new 'price' field.
     const {
         planId,
         locationId,
         startDate,
-        price, // Frontend sends the price it received from getAvailabilityAndPrice
+        price, 
         deliveryAddress,
         gstInfo,
         creativeFilePath,
@@ -31,13 +29,10 @@ const initiateOrder = asyncHandler(async (req, res) => {
     
     const userId = req.user.id;
 
-    // 2. VALIDATE the incoming data
     if (!planId || !locationId || !startDate || !creativeFilePath || !price) {
         throw new ApiError(400, "planId, locationId, startDate, price, and a creative file are required.");
     }
     
-    // 3. SERVER-SIDE PRICE VERIFICATION & DURATION FETCH (SECURITY STEP)
-    // This is a crucial security check to ensure the price hasn't been tampered with on the client-side.
     const { data: planDetails, error: planDetailsError } = await supabase
         .from('location_plan_pricing')
         .select('price, plans(duration_days)')
@@ -50,8 +45,6 @@ const initiateOrder = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Could not find a valid plan for this location.");
     }
     
-    // Compare the price from the DB with the price from the request.
-    // We cast to Number to avoid floating point comparison issues.
     if (Number(planDetails.price) !== Number(price)) {
         throw new ApiError(400, "Price mismatch. Please refresh and try again.");
     }
@@ -67,10 +60,6 @@ const initiateOrder = asyncHandler(async (req, res) => {
     calculatedEndDate.setDate(calculatedEndDate.getDate() + durationDays - 1);
     const endDateString = calculatedEndDate.toISOString().split('T')[0];
 
-    // ... The rest of the function (Steps 5, 6, 7, 8) remains exactly the same ...
-    // It will use the `verifiedPrice` and `amountInPaise` variables.
-
-    // 5. CREATE a Razorpay order (no change here)
     const rpOrder = await razorpay.orders.create({
         amount: amountInPaise,
         currency: "INR",
@@ -84,15 +73,14 @@ const initiateOrder = asyncHandler(async (req, res) => {
 
     const publicUrl = urlData.publicUrl;
 
-    // 6. CREATE the order record in our database (no change here, but uses the new dynamic price)
     const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
         user_id: userId,
         plan_id: planId,
         location_id: locationId,
         start_date: startDate,
         end_date: endDateString,
-        total_cost: price, // Use the dynamically fetched price
-        final_amount: price, // Use the dynamically fetched price
+        total_cost: price, 
+        final_amount: price, 
         delivery_address: deliveryAddress,
         gst_info: gstInfo,
         status: 'Pending Payment',
@@ -127,28 +115,21 @@ const initiateOrder = asyncHandler(async (req, res) => {
     }, "Order initiated. Please proceed to payment."));
 });
 
-// Phase 2: Verify payment and confirm booking atomically
-// The final, production-ready verifyPayment function
 
-// Final Refined and Edge-Case-Handled verifyPayment Controller
 const verifyPayment = asyncHandler(async (req, res) => {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = req.body;
 
-    // --- Pre-flight Check: Fetch the order from our DB first ---
     const { data: order, error: fetchError } = await supabase
         .from('orders')
         .select('status')
         .eq('id', orderId)
         .single();
 
-    // Edge Case: The order ID provided doesn't exist at all.
     if (fetchError || !order) {
         throw new ApiError(404, `The order with ID ${orderId} could not be found.`);
     }
 
-    // --- State Machine: Handle the order based on its CURRENT status ---
     switch (order.status) {
-        // --- Idempotency Cases: The job is already done. ---
         case 'Pending Approval':
         case 'Design Revise':
         case 'In Display':
@@ -156,19 +137,15 @@ const verifyPayment = asyncHandler(async (req, res) => {
             console.warn(`Idempotent call: Verification attempted for already processed order ${orderId}.`);
             return res.status(200).json(new ApiResponse(200, { orderId, status: order.status }, "This order has already been successfully processed."));
 
-        // --- Terminal State Cases: The order is dead and cannot be processed. ---
         case 'Cancelled - Refunded':
         case 'Cancelled':
         case 'Failed':
             console.warn(`Verification attempted for terminal order ${orderId} with status: ${order.status}.`);
             return res.status(409).json(new ApiResponse(409, { orderId, status: order.status }, `This order cannot be processed as it has a status of "${order.status}".`));
 
-        // --- The "Go" Case: This is the only state where we proceed. ---
         case 'Pending Payment':
-            // Now that we know the order is in the correct state, we can proceed.
-            break; // Continue execution below the switch statement.
+            break; 
         
-        // --- Default/Unknown State Case: Should not happen, but we handle it. ---
         default:
             console.error(`Verification attempted for order ${orderId} with an unknown or invalid status: ${order.status}.`);
             throw new ApiError(409, `The order is in an state of (${order.status}) and booking cannot be processed.`);
@@ -185,12 +162,10 @@ const verifyPayment = asyncHandler(async (req, res) => {
     }
     */
 
-    // 2. Attempt the atomic booking via RPC
     const { data: rpcResult, error: rpcError } = await supabase.rpc('confirm_booking_and_update_inventory', {
         p_order_id: orderId
     });
     
-    // 3. Handle the RPC Result
     switch (rpcResult) {
         case 'SUCCESS':
            
@@ -218,26 +193,22 @@ const verifyPayment = asyncHandler(async (req, res) => {
                 throw new ApiError(500, "The slot became unavailable, but we failed to process an automatic refund. Please contact support immediately with your order ID.");
             }
         
-        // These cases should not be hit if our pre-flight check is working, but we handle them for ultimate safety.
         case 'ORDER_NOT_PENDING':
         case 'ORDER_NOT_FOUND':
         case 'TRANSACTION_ERROR':
         default:
             console.error(`A critical and unexpected database error occurred for order ${orderId}. RPC Result: ${rpcResult}, RPC Error: ${rpcError?.message}`);
-            // Do not attempt a refund here as the DB state is unknown.
             throw new ApiError(500, "A critical server error occurred while confirming your booking. Please contact support immediately.");
     }
 });
 const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_signature }) => {
-    // 1. Update the order status and payment details
     await supabase.from('orders').update({
         razorpay_payment_id,
         razorpay_signature,
         status: 'Pending Approval'
     }).eq('id', orderId);
 
-    // 2. Fetch the complete order data needed for the email
-    // We need to join with other tables to get all the names.
+
     const { data: fullOrderDetails, error: detailsError } = await supabase
         .from('orders')
         .select(`
@@ -268,8 +239,6 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
             fullOrderDetails.profiles.full_name
         );
     } catch (emailError) {
-        // IMPORTANT: If the email fails, we don't want to fail the whole transaction.
-        // The user's payment was successful. We just log the email error and move on.
         console.error(`Email failed to send for successfully paid order ${orderId}:`, emailError);
     }
 };
@@ -277,8 +246,6 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
 const getUserOrders = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
-    // Step 1: Update the Supabase query to join with the 'creatives' table.
-    // We select all columns from orders, plans, locations, and creatives.
     const { data: orders, error } = await supabase
         .from("orders")
         .select(`
@@ -298,33 +265,6 @@ const getUserOrders = asyncHandler(async (req, res) => {
     if (!orders) {
          return res.status(200).json(new ApiResponse(200, [], "User has no orders."));
     }
-
-    // Step 2: Generate signed URLs for each creative's file_path.
-    // We use Promise.all for performance, generating all URLs concurrently.
-    // const ordersWithSignedUrls = await Promise.all(
-    //     orders.map(async (order) => {
-    //         // The result from the query might be an array of creatives, but we assume one creative per order for now.
-    //         const creative = order.creatives[0];
-            
-    //         if (creative && creative.file_path) {
-    //             // Generate a signed URL that is valid for a limited time (e.g., 1 hour).
-    //             const { data: signedUrlData, error: urlError } = await supabase
-    //                 .storage
-    //                 .from('ad-creatives') // Make sure this is your bucket name
-    //                 .createSignedUrl(creative.file_path, 3600); // 3600 seconds = 1 hour
-
-    //             if (urlError) {
-    //                 console.error(`Could not create signed URL for path: ${creative.file_path}`, urlError);
-    //                 // If URL generation fails, we can still return the order without the image URL.
-    //                 creative.publicUrl = null; 
-    //             } else {
-    //                 creative.publicUrl = signedUrlData.signedUrl;
-    //             }
-    //         }
-            
-    //         return order;
-    //     })
-    // );
 
     res.status(200).json(new ApiResponse(200, orders, "User orders retrieved successfully."));
 });

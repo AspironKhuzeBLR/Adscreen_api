@@ -429,6 +429,22 @@ const login = asyncHandler(async (req, res) => {
   if (!email || !password)
     throw new ApiError(400, "Email and password are required.");
 
+  const { data: userProfile, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('deleted_at')
+        .eq('email', email)
+        .single();
+    
+    if (profileCheckError && profileCheckError.code !== 'PGRST116') {
+
+        throw new ApiError(500, "An error occurred while checking user status.", profileCheckError);
+    }
+    
+   
+    if (userProfile && userProfile.deleted_at) {
+        throw new ApiError(403, "Your account has been deactivated. Please contact support to reactivate it.");
+    }
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -809,19 +825,21 @@ const completePhoneUpdate = asyncHandler(async (req, res) => {
     );
 });
 
+// src/api/controllers/authController.js
+
 const deleteAccount = asyncHandler(async (req, res) => {
   const { password } = req.body;
   const userId = req.user.id;
+
+  const userJwt = req.headers.authorization?.split(' ')[1];
   if (!password) {
-    throw new ApiError(
-      400,
-      "Password is required to confirm account deletion."
-    );
+    throw new ApiError(400, "Password is required to confirm account deletion.");
   }
   if (!userId) {
     throw new ApiError(401, "User not authenticated.");
   }
 
+  // 2. --- FETCH USER EMAIL FOR PASSWORD VERIFICATION ---
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("email")
@@ -832,6 +850,8 @@ const deleteAccount = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User profile not found.");
   }
 
+  // 3. --- VERIFY USER'S PASSWORD TO AUTHORIZE DELETION ---
+  // This is a crucial security step to ensure the account owner is the one deleting.
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email: profile.email,
     password: password,
@@ -845,44 +865,40 @@ const deleteAccount = asyncHandler(async (req, res) => {
     );
   }
 
-  const { error: deleteProfileError } = await supabase
+  // 4. --- PERFORM SOFT DELETE ON THE PROFILE ---
+  // Instead of deleting, we UPDATE the profile to mark it as deleted.
+  // This preserves the record for historical data (like orders) while making it inactive.
+  const { error: softDeleteError } = await supabase
     .from("profiles")
-    .delete()
+    .update({ deleted_at: new Date().toISOString() }) // Set the deleted_at timestamp
     .eq("id", userId);
 
-  if (deleteProfileError) {
+  if (softDeleteError) {
     console.error(
-      "Failed to delete user profile, aborting account deletion:",
-      deleteProfileError
+      "Failed to soft-delete user profile, aborting account deletion:",
+      softDeleteError
     );
     throw new ApiError(
       500,
-      "Could not delete user profile. Please try again.",
-      deleteProfileError
+      "Could not update user profile for deletion. Please try again.",
+      softDeleteError
     );
   }
 
-  const { error: deleteAuthUserError } = await supabase.auth.admin.deleteUser(
-    userId
-  );
-
-  if (deleteAuthUserError) {
-    console.error(
-      `CRITICAL: User profile ${userId} was deleted but failed to delete auth user.`,
-      deleteAuthUserError
-    );
-    throw new ApiError(
-      500,
-      "Failed to completely delete user account. Please contact support.",
-      deleteAuthUserError
-    );
+  // This effectively logs them out everywhere and prevents them from getting a new session token.
+  const { error: signOutError } = await supabase.auth.admin.signOut(userJwt);
+  
+  if (signOutError) {
+      // This is a critical error to log, as the user might still have an active session.
+      // However, RLS policies (Step 2) will be our final line of defense.
+      console.error(`CRITICAL: User profile ${userId} was soft-deleted but failed to sign out globally.`, signOutError);
   }
 
+  // 6. --- RESPOND WITH SUCCESS ---
+  // The message now accurately reflects that the account is deactivated/deleted, not just "permanently erased".
   res
     .status(200)
-    .json(
-      new ApiResponse(200, null, "Your account has been permanently deleted.")
-    );
+    .json(new ApiResponse(200, null, "Your account has been successfully deleted."));
 });
 
 module.exports = {

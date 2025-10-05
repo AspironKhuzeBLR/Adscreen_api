@@ -39,6 +39,16 @@ const protect = asyncHandler(async (req, res, next) => {
   } catch (error) {
     return next(new ApiError(401, 'Token verification failed'));
   }
-})    ;
+});
 
-module.exports = { protect };
+const checkAdminRole = asyncHandler(async (req, res, next) => {
+    const userRole = req.user?.profile?.user_role;
+
+    if (userRole && userRole === 'admin') {
+        return next();
+    }
+    throw new ApiError(403, "Access denied. You do not have permission to perform this action.");
+});
+
+
+module.exports = { protect, checkAdminRole };

@@ -82,12 +82,26 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
 
 
 const getAllOrders = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, status, sortBy = 'created_at', sortOrder = 'desc' } = req.query;
 
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
+    let { page = 1, limit = 10, status, sortBy = 'created_at', sortOrder = 'desc' } = req.query;
+
+    let pageNum = parseInt(page, 10);
+    let limitNum = parseInt(limit, 10);
+
+    if (isNaN(pageNum) || pageNum < 1) {
+        pageNum = 1;
+    }
+
+    if (isNaN(limitNum) || limitNum < 1) {
+        limitNum = 10;
+    } else if (limitNum > 100) {
+        limitNum = 100; 
+    }
+
+    
     const from = (pageNum - 1) * limitNum;
     const to = from + limitNum - 1;
+
 
     let query = supabase
         .from('orders')
@@ -96,22 +110,26 @@ const getAllOrders = asyncHandler(async (req, res) => {
             profiles (full_name, email),
             locations (name),
             plans (name)
-        `);
+        `, { count: 'exact' }); 
 
     if (status) {
         query = query.eq('status', status);
     }
 
+    // Apply sorting.
     query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
+    // Apply pagination.
     query = query.range(from, to);
 
+    
     const { data, error, count } = await query;
 
     if (error) {
         throw new ApiError(500, "Failed to fetch orders.", error);
     }
 
+    
     res.status(200).json(
         new ApiResponse(
             200,
@@ -120,7 +138,8 @@ const getAllOrders = asyncHandler(async (req, res) => {
                 pagination: {
                     currentPage: pageNum,
                     totalPages: Math.ceil(count / limitNum),
-                    totalOrders: count
+                    totalOrders: count, // 'count' is the total number of records matching the query.
+                    limit: limitNum
                 }
             },
             "Orders retrieved successfully."

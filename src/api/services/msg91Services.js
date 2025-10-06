@@ -132,20 +132,17 @@ const sendPasswordResetLink = async (email, customerName, resetLink) => {
     return sendEmail(LINK_BASED_RESET_TPL_ID, email, variables);
 };
 const sendOrderConfirmationEmail = async (orderDetails, recipientEmail, customerName) => {
-    // IMPORTANT: Add this new template ID to your .env file
     const ORDER_CONFIRM_TPL_ID = process.env.MSG91_ORDER_CONFIRMATION_TPL_ID;
 
-    // Construct the order link for the email button
-    const orderLink = `${process.env.CLIENT_URL}/orders/${orderDetails.order_uid}`; // Assuming you have a unique order_uid
+    const orderLink = `${process.env.FRONTEND_URL}/my-orders`; 
 
-    // Map the order details to the variables in your MSG91 template
     const variables = {
         CUSTOMER_NAME: customerName,
-        ORDER_ID: orderDetails.order_uid || orderDetails.id, // Use a user-friendly UID if available
-        start_date: new Date(orderDetails.start_date).toLocaleDateString('en-GB'), // Format date nicely
+        ORDER_ID: orderDetails.order_uid || orderDetails.id, 
+        start_date: new Date(orderDetails.start_date).toLocaleDateString('en-GB'), 
         location_name: orderDetails.location_name,
         plan_name: orderDetails.plan_name,
-        gross_amount: orderDetails.final_amount || orderDetails.total_cost, // Use final_amount if it exists
+        gross_amount: orderDetails.final_amount || orderDetails.total_cost, 
         ORDER_LINK: orderLink,
     };
 

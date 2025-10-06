@@ -246,27 +246,63 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
 const getUserOrders = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
-    const { data: orders, error } = await supabase
-        .from("orders")
+    let { page = 1, limit = 10, status, sortBy = 'created_at', sortOrder = 'desc' } = req.query;
+
+    let pageNum = parseInt(page, 10);
+    let limitNum = parseInt(limit, 10);
+
+    if (isNaN(pageNum) || pageNum < 1) {
+        pageNum = 1;
+    }
+    if (isNaN(limitNum) || limitNum < 1) {
+        limitNum = 10;
+    } else if (limitNum > 50) { 
+        limitNum = 50;
+    }
+
+    const from = (pageNum - 1) * limitNum;
+    const to = from + limitNum - 1;
+
+    let query = supabase
+        .from('orders')
         .select(`
             *,
             plans (*),
             locations (*),
             creatives (*)
-        `)
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+        `, { count: 'exact' }); 
+
+    query = query.eq('user_id', userId);
+
+    if (status) {
+        query = query.eq('status', status);
+    }
+
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+
+    query = query.range(from, to);
+
+    const { data, error, count } = await query;
 
     if (error) {
         console.error("Error fetching user orders:", error);
         throw new ApiError(500, "Could not fetch user orders.");
     }
-    
-    if (!orders) {
-         return res.status(200).json(new ApiResponse(200, [], "User has no orders."));
-    }
 
-    res.status(200).json(new ApiResponse(200, orders, "User orders retrieved successfully."));
+    res.status(200).json(
+        new ApiResponse(
+            200,
+            {
+                orders: data,
+                pagination: {
+                    currentPage: pageNum,
+                    totalPages: Math.ceil(count / limitNum),
+                    totalOrders: count,
+                    limit: limitNum
+                }
+            },
+            "User orders retrieved successfully."
+        )
+    );
 });
-
 module.exports = { initiateOrder, verifyPayment, getUserOrders };

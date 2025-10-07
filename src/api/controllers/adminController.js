@@ -9,10 +9,8 @@ const BUCKET_NAME = "ad-creatives";
 
 const updateOrderDetails = asyncHandler(async (req, res) => {
     const { orderId } = req.params;
-    // We now accept 'adDisplayPath' in addition to the other fields
     const { status, remarks, adDisplayUrl, adDisplayPath } = req.body;
 
-    // 1. --- VALIDATE INPUT ---
     if (!orderId) {
         throw new ApiError(400, "Order ID is required.");
     }
@@ -20,8 +18,8 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
     if (!status && !remarks && !adDisplayUrl && !adDisplayPath) {
         throw new ApiError(400, "At least one field (status, remarks, adDisplayUrl, or adDisplayPath) must be provided to update.");
     }
-    
-    const validStatuses = ['Pending Approval', 'In Display', 'Completed', 'Cancelled', 'Design Revise', 'Cancelled - Refunded'];
+
+    const validStatuses = ['Pending Payment','Pending Approval', 'In Display', 'Completed', 'Cancelled', 'Design Revise', 'Cancelled - Refunded'];
     if (status && !validStatuses.includes(status)) {
         throw new ApiError(400, `Invalid status value. Must be one of: ${validStatuses.join(', ')}`);
     }

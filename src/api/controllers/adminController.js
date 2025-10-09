@@ -3,6 +3,8 @@ const asyncHandler = require('../../utils/asyncHandler');
 const ApiError = require('../../utils/ApiError');
 const ApiResponse = require('../../utils/ApiResponse');
 const path = require("path");
+const msg91Service = require("../services/msg91Services");
+
 
 const BUCKET_NAME = "ad-creatives"; 
 
@@ -23,11 +25,28 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
     if (status && !validStatuses.includes(status)) {
         throw new ApiError(400, `Invalid status value. Must be one of: ${validStatuses.join(', ')}`);
     }
+   const { data: currentOrder, error: fetchError } = await supabase
+        .from('orders')
+        .select(`
+            *,
+            profiles (full_name, email),
+            locations (name),
+            plans (name)
+        `)
+        .eq('id', orderId)
+        .single();
 
+    if (fetchError || !currentOrder) {
+        throw new ApiError(404, `Order with ID ${orderId} not found.`);
+    }
+
+    // Store the old status for comparison later.
+    const oldStatus = currentOrder.status;
+
+    // --- 3. CONSTRUCT THE UPDATE PAYLOAD (Same as before) ---
     const updateData = {};
     if (status) updateData.status = status;
     if (remarks) updateData.remarks = remarks;
-
     if (adDisplayPath) {
         const { data: urlData } = supabase.storage
             .from(BUCKET_NAME)
@@ -47,20 +66,28 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
     
     updateData.updated_at = new Date().toISOString();
 
-    const { data: updatedOrder, error } = await supabase
+      // --- 4. PERFORM THE UPDATE ---
+    const { data: updatedOrder, error: updateError } = await supabase
         .from('orders')
         .update(updateData)
         .eq('id', orderId)
-        .select()
+        .select() // Re-selecting the data is not strictly necessary but confirms the update
         .single();
 
-    if (error) {
-        if (error.code === 'PGRST116') {
-            throw new ApiError(404, `Order with ID ${orderId} not found.`);
-        }
-        throw new ApiError(500, "Failed to update the order.", error);
+    if (updateError) {
+        throw new ApiError(500, "Failed to update the order.", updateError);
     }
 
+    if (status && status !== oldStatus) {
+        console.log(`Order ${orderId} status changed from '${oldStatus}' to '${status}'. Triggering email.`);
+        try {
+            console.log("email sent")
+          const emailPayload = { ...currentOrder, status: updatedOrder.status };
+            await msg91Service.sendOrderStatusUpdateEmail(emailPayload);
+        } catch (emailError) {
+         console.error(`Email failed to send for successfully updated order ${orderId}:`, emailError);
+        }
+    }
     res.status(200).json(
         new ApiResponse(
             200,

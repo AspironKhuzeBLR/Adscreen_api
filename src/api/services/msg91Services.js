@@ -185,6 +185,28 @@ const sendContactAdminNotificationEmail = async (formData) => {
     console.log(`Sending new contact form notification to admin: ${ADMIN_EMAIL}`);
     return sendEmail(CONTACT_ADMIN_NOTIFY_TPL_ID, ADMIN_EMAIL, variables);
 };
+
+const sendOrderStatusUpdateEmail = async (orderDetails) => {
+    const ORDER_STATUS_UPDATE_TPL_ID = process.env.MSG91_ORDER_STATUS_UPDATE_TPL_ID;
+
+    const recipientEmail = orderDetails.profiles.email;
+    const customerName = orderDetails.profiles.full_name;
+
+    const orderLink = `${process.env.FRONTEND_URL}/orders/${orderDetails.order_uid}`;
+
+    const variables = {
+        CUSTOMER_NAME: customerName,
+        ORDER_ID: orderDetails.order_uid,
+        start_date: new Date(orderDetails.start_date).toLocaleDateString('en-GB'), 
+        location_name: orderDetails.locations.name,
+        plan_name: orderDetails.plans.name,
+        ORDER_LINK: orderLink,
+        NEW_STATUS: orderDetails.status 
+    };
+
+    console.log(`Sending order status update for order ID ${orderDetails.id} to ${recipientEmail}`);
+    return sendEmail(ORDER_STATUS_UPDATE_TPL_ID, recipientEmail, variables);
+};
 module.exports = {
     generateOtp,
     sendSmsWithOtp,
@@ -196,5 +218,6 @@ module.exports = {
     sendEmailUpdateOtp,
     sendOrderConfirmationEmail,
     sendContactUserConfirmationEmail,
-    sendContactAdminNotificationEmail
+    sendContactAdminNotificationEmail,
+    sendOrderStatusUpdateEmail
 };

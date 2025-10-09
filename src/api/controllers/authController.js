@@ -710,7 +710,7 @@ const startPhoneUpdate = asyncHandler(async (req, res) => {
 
   if (!newPhoneNumber)
     throw new ApiError(400, "A new phone number is required.");
-
+  
   const { data: currentUserProfile, error: currentProfileError } =
     await supabase
       .from("profiles")
@@ -723,7 +723,7 @@ const startPhoneUpdate = asyncHandler(async (req, res) => {
       "Error fetching current user profile.",
       currentProfileError
     );
-
+  console.log(currentUserProfile.phone_number, newPhoneNumber);
   if (
     currentUserProfile &&
     currentUserProfile.phone_number === newPhoneNumber

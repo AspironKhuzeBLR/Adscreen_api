@@ -24,14 +24,11 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
         throw new ApiError(400, `Invalid status value. Must be one of: ${validStatuses.join(', ')}`);
     }
 
-    // 2. --- CONSTRUCT THE UPDATE PAYLOAD ---
     const updateData = {};
     if (status) updateData.status = status;
     if (remarks) updateData.remarks = remarks;
 
-    // --- NEW LOGIC: Generate public URL from the path if provided ---
     if (adDisplayPath) {
-        // Generate the full public URL on the backend. This is more secure and robust.
         const { data: urlData } = supabase.storage
             .from(BUCKET_NAME)
             .getPublicUrl(adDisplayPath);
@@ -39,21 +36,17 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
         const publicUrl = urlData.publicUrl;
 
         if (!publicUrl) {
-            // This can happen if the path is invalid. We should throw an error.
             throw new ApiError(404, `Could not generate a public URL for the provided path: ${adDisplayPath}. Please ensure the path is correct and the file was uploaded.`);
         }
         
-        // Use snake_case for the database column name
         updateData.ad_display_url = publicUrl;
 
     } else if (adDisplayUrl) {
-        // Keep this for backward compatibility or if an admin wants to paste a URL directly.
         updateData.ad_display_url = adDisplayUrl;
     }
     
     updateData.updated_at = new Date().toISOString();
 
-    // 3. --- PERFORM THE UPDATE ---
     const { data: updatedOrder, error } = await supabase
         .from('orders')
         .update(updateData)
@@ -68,7 +61,6 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Failed to update the order.", error);
     }
 
-    // 4. --- RESPOND WITH SUCCESS ---
     res.status(200).json(
         new ApiResponse(
             200,
@@ -114,12 +106,8 @@ const getAllOrders = asyncHandler(async (req, res) => {
         query = query.eq('status', status);
     }
 
-    // Apply sorting.
     query = query.order(sortBy, { ascending: sortOrder === 'asc' });
-
-    // Apply pagination.
     query = query.range(from, to);
-
     
     const { data, error, count } = await query;
 
@@ -136,7 +124,7 @@ const getAllOrders = asyncHandler(async (req, res) => {
                 pagination: {
                     currentPage: pageNum,
                     totalPages: Math.ceil(count / limitNum),
-                    totalOrders: count, // 'count' is the total number of records matching the query.
+                    totalOrders: count, 
                     limit: limitNum
                 }
             },

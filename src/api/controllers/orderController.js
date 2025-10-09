@@ -52,7 +52,6 @@ const initiateOrder = asyncHandler(async (req, res) => {
     const durationDays = planDetails.plans.duration_days;
     const verifiedPrice = planDetails.price;
 
-    // 4. PREPARE order details (uses the verified price)
     const orderUID = `ORD-${nanoid(12).toUpperCase()}`;
     const amountInPaise = Math.round(verifiedPrice * 100);
 

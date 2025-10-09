@@ -53,14 +53,16 @@ const initiateOrder = asyncHandler(async (req, res) => {
     const verifiedPrice = planDetails.price;
 
     const orderUID = `ORD-${nanoid(12).toUpperCase()}`;
-    const amountInPaise = Math.round(verifiedPrice * 100);
+    
+    const totalAmountIncludingGST = (verifiedPrice * 1.18);
+    const totalAmountInPaise = Math.round(totalAmountIncludingGST * 100);
 
     const calculatedEndDate = new Date(startDate);
     calculatedEndDate.setDate(calculatedEndDate.getDate() + durationDays - 1);
     const endDateString = calculatedEndDate.toISOString().split('T')[0];
 
     const rpOrder = await razorpay.orders.create({
-        amount: amountInPaise,
+        amount: totalAmountInPaise,
         currency: "INR",
         receipt: orderUID,
         notes: { userId, planId, locationId }

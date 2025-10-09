@@ -168,7 +168,7 @@ const sendContactUserConfirmationEmail = async (recipientEmail, formData) => {
 
 const sendContactAdminNotificationEmail = async (formData) => {
     const CONTACT_ADMIN_NOTIFY_TPL_ID = process.env.MSG91_CONTACT_ADMIN_NOTIFY_TPL_ID;
-    const ADMIN_EMAIL = process.env.ADMIN_CONTACT_EMAIL; // Admin's email, e.g., info@adscreenhub.com
+    const ADMIN_EMAIL = process.env.ADMIN_CONTACT_EMAIL; 
 
     if (!ADMIN_EMAIL) {
         console.error('ADMIN_CONTACT_EMAIL is not set in environment variables. Admin notification email cannot be sent.');
@@ -192,7 +192,7 @@ const sendOrderStatusUpdateEmail = async (orderDetails) => {
     const recipientEmail = orderDetails.profiles.email;
     const customerName = orderDetails.profiles.full_name;
 
-    const orderLink = `${process.env.FRONTEND_URL}/orders/${orderDetails.order_uid}`;
+    const orderLink = `${process.env.FRONTEND_URL}/my-orders`;
 
     const variables = {
         CUSTOMER_NAME: customerName,

@@ -196,10 +196,9 @@ const finalizeReupload = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Failed to update creative record.", creativeUpdateError);
     }
 
-    // 4. UPDATE the 'orders' table with the new direct URL.
     const { error: orderUpdateError } = await supabase
         .from("orders")
-        .update({ creative_url: publicUrl })
+        .update({ creative_image_url: publicUrl })
         .eq("id", orderId);
 
     if (orderUpdateError) {

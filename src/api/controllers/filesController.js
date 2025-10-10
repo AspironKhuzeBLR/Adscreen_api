@@ -121,7 +121,6 @@ const createReuploadUrl = asyncHandler(async (req, res) => {
     if (!fileName || !fileType) {
         throw new ApiError(400, "fileName and fileType are required.");
     }
-    console.log(orderId, userId);
 
     const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -181,12 +180,12 @@ const finalizeReupload = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Could not retrieve the public URL for the newly uploaded file.");
     }
 
-    // 3. UPDATE the existing record in the 'creatives' table.
     const { error: creativeUpdateError } = await supabase
         .from("creatives")
         .update({
             file_path: filePath,
             file_name: fileName,
+            image_url: publicUrl,
             doc_type: docType,
             uploaded_at: new Date().toISOString()
         })
@@ -204,10 +203,10 @@ const finalizeReupload = asyncHandler(async (req, res) => {
     if (orderUpdateError) {
         console.error(`Failed to update order ${orderId} with new creative_url.`, orderUpdateError);
     }
-    
-    // 5. (Optional but Recommended) Delete the old file from storage.
+
     if (oldCreative && oldCreative.file_path) {
         try {
+            console.log("Removing old creative file at path:", oldCreative.file_path);
             await supabase.storage.from(BUCKET_NAME).remove([oldCreative.file_path]);
         } catch (removeError) {
             console.error(`Failed to remove old creative file at path: ${oldCreative.file_path}`, removeError);

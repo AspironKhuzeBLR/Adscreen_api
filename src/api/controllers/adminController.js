@@ -6,75 +6,80 @@ const path = require("path");
 const msg91Service = require("../services/msg91Services");
 
 const BUCKET_NAME = "ad-creatives";
-
 const updateOrderDetails = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
   const { status, remarks, adDisplayUrl, adDisplayPath } = req.body;
 
+  // --- Initial validation (no changes here) ---
   if (!orderId) {
     throw new ApiError(400, "Order ID is required.");
   }
-
   if (!status && !remarks && !adDisplayUrl && !adDisplayPath) {
-    throw new ApiError(
-      400,
-      "At least one field (status, remarks, adDisplayUrl, or adDisplayPath) must be provided to update."
-    );
+    throw new ApiError(400, "At least one field must be provided to update.");
   }
-
- const validStatuses = [
-        'Pending Payment',
-        'Payment Failed', // New
-        'Pending Approval',
-        'Design Revise',
-        'Pending Display Approval', // New
-        'In Display',
-        'Completed',
-        'Cancelled - Forfeited', // New
-        'Cancelled', // Kept for general purpose cancellation if needed
-        'Cancelled - Refunded' // Special admin-only status
-    ];
-
+  const validStatuses = [
+    "Pending Payment",
+    "Payment Failed",
+    "Pending Approval",
+    "Design Revise",
+    "Pending Display (Approved)",
+    "In Display",
+    "Completed",
+    "Cancelled-Forfeited",
+    "Cancelled-Refunded",
+  ];
   if (status && !validStatuses.includes(status)) {
     throw new ApiError(
       400,
       `Invalid status value. Must be one of: ${validStatuses.join(", ")}`
     );
   }
+
+  // --- Fetch current order (no changes here) ---
   const { data: currentOrder, error: fetchError } = await supabase
     .from("orders")
-    .select(
-      `
-            *,
-            profiles (full_name, email),
-            locations (name),
-            plans (name)
-        `
-    )
+    .select(`*, profiles (full_name, email), locations (name), plans (name)`)
     .eq("id", orderId)
     .single();
 
   if (fetchError || !currentOrder) {
     throw new ApiError(404, `Order with ID ${orderId} not found.`);
   }
-  const oldStatus = currentOrder.status;
-  if (status && status !== oldStatus) {
-    const allowedTransitions = {
-      "Pending Approval": ["Pending Display Approval", "Design Revise"],
-    };
 
-     if (status === 'Cancelled - Refunded') {
-            } else if (allowedTransitions[oldStatus]) {
-            // Rule 3: Check if the requested transition is valid for the current state.
-            if (!allowedTransitions[oldStatus].includes(status)) {
-                throw new ApiError(400, `Invalid status change. From '${oldStatus}', you can only change to: ${allowedTransitions[oldStatus].join(', ')}`);
-            }
-        } else {
-            // Rule 4: Block manual changes from states that are managed automatically.
-            throw new ApiError(400, `The status '${oldStatus}' is managed by the system and cannot be changed manually.`);
-        }
+  // --- NEW, SIMPLIFIED LOGIC BELOW ---
+
+  const oldStatus = currentOrder.status;
+
+  // Only validate if a status change is being requested.
+  if (status && status !== oldStatus) {
+    // 1. Define the list of statuses an admin is explicitly allowed to set manually.
+    const allowedManualStatuses = [
+      "Pending Payment",
+      "Payment Failed",
+      "Pending Approval",
+      "Design Revise",
+      "Pending Display (Approved)",
+      "In Display",
+      "Completed",
+      "Cancelled-Forfeited",
+      "Cancelled-Refunded",
+    ];
+
+    // 2. If the requested status is NOT in this list, block the change.
+    if (!allowedManualStatuses.includes(status)) {
+      throw new ApiError(
+        400,
+        `The status '${status}' is managed by the system and cannot be set manually. You can only set the status to: ${allowedManualStatuses.join(
+          ", "
+        )}.`
+      );
     }
-  // --- 3. CONSTRUCT THE UPDATE PAYLOAD (Same as before) ---
+    // If the status is in the allowed list, the code will simply proceed with the update.
+  }
+
+  // --- END OF NEW LOGIC ---
+
+  // --- Construct payload and perform update (no changes here) ---
   const updateData = {};
   if (status) updateData.status = status;
   if (remarks) updateData.remarks = remarks;
@@ -82,16 +87,13 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
     const { data: urlData } = supabase.storage
       .from(BUCKET_NAME)
       .getPublicUrl(adDisplayPath);
-
     const publicUrl = urlData.publicUrl;
-
     if (!publicUrl) {
       throw new ApiError(
         404,
-        `Could not generate a public URL for the provided path: ${adDisplayPath}. Please ensure the path is correct and the file was uploaded.`
+        `Could not generate a public URL for the path: ${adDisplayPath}.`
       );
     }
-
     updateData.ad_display_url = publicUrl;
   } else if (adDisplayUrl) {
     updateData.ad_display_url = adDisplayUrl;
@@ -99,24 +101,23 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
 
   updateData.updated_at = new Date().toISOString();
 
-  // --- 4. PERFORM THE UPDATE ---
   const { data: updatedOrder, error: updateError } = await supabase
     .from("orders")
     .update(updateData)
     .eq("id", orderId)
-    .select() // Re-selecting the data is not strictly necessary but confirms the update
+    .select()
     .single();
 
   if (updateError) {
     throw new ApiError(500, "Failed to update the order.", updateError);
   }
 
+  // --- Trigger email (no changes here) ---
   if (status && status !== oldStatus) {
     console.log(
       `Order ${orderId} status changed from '${oldStatus}' to '${status}'. Triggering email.`
     );
     try {
-      console.log("email sent");
       const emailPayload = { ...currentOrder, status: updatedOrder.status };
       await msg91Service.sendOrderStatusUpdateEmail(emailPayload);
     } catch (emailError) {
@@ -126,6 +127,7 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
       );
     }
   }
+
   res
     .status(200)
     .json(

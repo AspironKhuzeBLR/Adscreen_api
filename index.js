@@ -9,6 +9,8 @@ const orderRouter = require('./src/api/routes/orderRoutes');
 const fileRouter = require('./src/api/routes/filesRoutes'); 
 const contactRoutes = require('./src/api/routes/contactRoutes'); 
 const adminRoutes = require('./src/api/routes/adminRoutes');
+const { initializeScheduler } = require('./src/utils/orderStatusScheduler'); // Adjust path as needed
+
 
 const app = express();
 const port = process.env.PORT || 8000;
@@ -33,6 +35,9 @@ app.use('/api/v1/contact', contactRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
 app.use(errorHandler);
+
+
+initializeScheduler();
 
 app.listen(port, () => {
     console.log(`Server is listening on port ${port}`);

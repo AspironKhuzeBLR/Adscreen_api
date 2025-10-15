@@ -1,356 +1,50 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AdScreenHub - Booking Flow Simulation</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f9; margin: 0; padding: 40px; }
-        .container { max-width: 800px; margin: auto; background: #fff; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden; }
-        .screen { padding: 30px; border-bottom: 1px solid #eef; }
-        .screen:last-child { border-bottom: none; }
-        .screen.hidden { display: none; }
-        h2 { color: #333; margin-top: 0; }
-        h3 { color: #555; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-top: 30px; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; color: #555; font-weight: 500; }
-        input[type="date"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
-        .card-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
-        .card { border: 1px solid #ddd; border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.2s; }
-        .card:hover { border-color: #007bff; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-        .card.selected { border-color: #007bff; background-color: #e9f5ff; border-width: 2px; padding: 19px; }
-        .card.disabled { background-color: #f8f9fa; cursor: not-allowed; opacity: 0.6; }
-        .card h4 { margin-top: 0; }
-        .card .price { font-size: 24px; font-weight: bold; color: #007bff; margin: 10px 0; }
-        .availability { font-size: 13px; color: #28a745; background: #e9f8ee; padding: 4px 8px; border-radius: 4px; display: inline-block; }
-        .availability.low { color: #ffc107; background: #fff8e1; }
-        .availability.sold-out { color: #dc3545; background: #fdeeee; }
-        .summary { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px; }
-        .summary-item { display: flex; justify-content: space-between; padding: 8px 0; font-size: 15px; }
-        .summary-item.total { font-weight: bold; font-size: 18px; color: #333; border-top: 1px solid #ddd; margin-top: 10px; padding-top: 10px; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 4px; background-color: #007bff; color: white; font-size: 16px; cursor: pointer; transition: background-color 0.2s; margin-top: 10px; }
-        button:hover { background-color: #0056b3; }
-        button:disabled { background-color: #a0cffa; cursor: not-allowed; }
-        .api-simulation { font-family: 'Courier New', Courier, monospace; background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 5px; margin-top: 20px; font-size: 13px; white-space: pre-wrap; word-wrap: break-word; }
-        .api-simulation strong { color: #9ae6b4; }
-        .api-simulation .comment { color: #63b3ed; }
-        .error-box { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 4px; margin-top: 20px; text-align: center; }
-        .success-box { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 4px; margin-top: 20px; text-align: center; }
-    </style>
-</head>
-<body>
-
-    <div class="container">
-        <!-- SCREEN 1: Date and Location Selection -->
-        <div id="screen-location" class="screen">
-            <h2>1. Select Date & Location</h2>
-            <div class="form-group">
-                <label for="start-date">Select Display Start Date</label>
-                <input type="date" id="start-date">
-            </div>
-            <div id="location-list" class="card-container hidden">
-                <!-- Locations will be dynamically inserted here -->
-            </div>
-            <div id="api-location" class="api-simulation hidden"></div>
-        </div>
-
-        <!-- SCREEN 2: Plan Selection & Summary -->
-        <div id="screen-plan" class="screen hidden">
-            <h2>2. Select Your Plan</h2>
-            <p>You have selected: <strong id="selected-location-name"></strong> starting on <strong id="selected-start-date-text"></strong></p>
-            <div id="plan-list" class="card-container">
-                <!-- Plans will be dynamically inserted here -->
-            </div>
-            <div id="api-plan-check" class="api-simulation hidden"></div>
-
-            <div id="summary-section" class="summary hidden">
-                <h3>Booking Summary</h3>
-                <div class="summary-item"><span>Location:</span> <span id="summary-location"></span></div>
-                <div class="summary-item"><span>Plan:</span> <span id="summary-plan"></span></div>
-                <div class="summary-item"><span>Duration:</span> <span id="summary-duration"></span></div>
-                <div class="summary-item"><span>Dates:</span> <span id="summary-dates"></span></div>
-                <div class="summary-item total"><span>Total:</span> <span id="summary-total"></span></div>
-                <button id="btn-proceed-to-payment">Proceed to Payment</button>
-            </div>
-            <div id="api-initiate" class="api-simulation hidden"></div>
-        </div>
-        
-        <!-- SCREEN 3: Payment Simulation -->
-        <div id="screen-payment" class="screen hidden">
-            <h2>3. Payment Gateway</h2>
-            <p>You are being redirected to Razorpay to complete your payment.</p>
-            <div class="summary">
-                <div class="summary-item"><span>Order ID:</span> <span id="payment-order-id"></span></div>
-                <div class="summary-item total"><span>Amount to Pay:</span> <span id="payment-amount"></span></div>
-            </div>
-            <h3>Simulate Payment Outcome:</h3>
-            <button id="btn-payment-success">Simulate Successful Payment</button>
-            <button id="btn-payment-fail-conflict" style="background-color:#dc3545;">Simulate Success (but another user took the slot)</button>
-             <button id="btn-payment-fail-declined" style="background-color:#ffc107; color: #333;">Simulate Payment Declined</button>
-            <div id="api-verify" class="api-simulation hidden"></div>
-        </div>
-
-        <!-- SCREEN 4: Confirmation / Error -->
-        <div id="screen-confirmation" class="screen hidden">
-             <!-- Content will be dynamically inserted here -->
-        </div>
-
-    </div>
-
-    <script>
-        // --- DATA & STATE SIMULATION ---
-        const MOCK_LOCATIONS = [
-            { id: 1, name: "MG Road LED Screen", total_slots: 5 },
-            { id: 2, name: "Koramangala Billboard", total_slots: 3 },
-            { id: 3, name: "Indiranagar Display", total_slots: 8 },
-        ];
-        const MOCK_PLANS = [
-            { id: 101, name: "Spark", price: 4999, duration: 1 },
-            { id: 102, name: "Impact", price: 13999, duration: 3 },
-            { id: 103, name: "Thrive", price: 22999, duration: 5 },
-        ];
-        const MOCK_INVENTORY = {
-            "2025-09-08": { 1: 5, 2: 2 }, // MG Road sold out, Koramangala has 2 bookings
-            "2025-09-11": { 2: 3 }  // Koramangala sold out
-        };
-        const appState = {
-            startDate: null,
-            selectedLocationId: null,
-            selectedPlanId: null,
-            orderId: null,
-            razorpayOrderId: null
-        };
-
-        // --- DOM ELEMENTS ---
-        const screens = {
-            location: document.getElementById('screen-location'),
-            plan: document.getElementById('screen-plan'),
-            payment: document.getElementById('screen-payment'),
-            confirmation: document.getElementById('screen-confirmation'),
-        };
-        const apiBoxes = {
-            location: document.getElementById('api-location'),
-            planCheck: document.getElementById('api-plan-check'),
-            initiate: document.getElementById('api-initiate'),
-            verify: document.getElementById('api-verify'),
-        };
-
-        // --- UTILITY FUNCTIONS ---
-        function showScreen(screenName) {
-            Object.values(screens).forEach(s => s.classList.add('hidden'));
-            screens[screenName].classList.remove('hidden');
-        }
-        function showApi(boxName, title, content) {
-            const box = apiBoxes[boxName];
-            box.innerHTML = `<strong>${title}</strong><br><span class="comment">// Backend Action</span><br>${JSON.stringify(content, null, 2)}`;
-            box.classList.remove('hidden');
-        }
-        function formatDate(date) {
-            return date.toISOString().split('T')[0];
-        }
-        function addDays(date, days) {
-            const result = new Date(date);
-            result.setDate(result.getDate() + days);
-            return result;
-        }
-
-        // --- LOGIC FUNCTIONS ---
-        function handleDateChange(e) {
-            appState.startDate = new Date(e.target.value);
-            const dateString = formatDate(appState.startDate);
-            
-            showApi('location', 'GET /api/v1/data/locations/availability', { query: { date: dateString } });
-            
-            const inventoryForDate = MOCK_INVENTORY[dateString] || {};
-            const locationList = document.getElementById('location-list');
-            locationList.innerHTML = '';
-
-            MOCK_LOCATIONS.forEach(loc => {
-                const booked = inventoryForDate[loc.id] || 0;
-                const available = loc.total_slots - booked;
-                let availabilityHtml;
-                let statusClass = '';
-                if (available <= 0) {
-                    availabilityHtml = `<div class="availability sold-out">Sold Out</div>`;
-                    statusClass = 'disabled';
-                } else if (available < 3) {
-                     availabilityHtml = `<div class="availability low">${available} slots available</div>`;
-                } else {
-                     availabilityHtml = `<div class="availability">${available} slots available</div>`;
-                }
-                
-                locationList.innerHTML += `
-                    <div class="card location-card ${statusClass}" data-id="${loc.id}" onclick="selectLocation(${loc.id}, '${statusClass}')">
-                        <h4>${loc.name}</h4>
-                        ${availabilityHtml}
-                    </div>
-                `;
-            });
-            locationList.classList.remove('hidden');
-        }
-
-        function selectLocation(id, statusClass) {
-            if (statusClass === 'disabled') return;
-            appState.selectedLocationId = id;
-            document.querySelectorAll('.location-card').forEach(c => c.classList.remove('selected'));
-            document.querySelector(`.location-card[data-id="${id}"]`).classList.add('selected');
-            
-            // Populate and show next screen
-            const loc = MOCK_LOCATIONS.find(l => l.id === id);
-            document.getElementById('selected-location-name').innerText = loc.name;
-            document.getElementById('selected-start-date-text').innerText = formatDate(appState.startDate);
-            renderPlans();
-            showScreen('plan');
-        }
-
-        function renderPlans() {
-            const planList = document.getElementById('plan-list');
-            planList.innerHTML = '';
-            MOCK_PLANS.forEach(p => {
-                 planList.innerHTML += `
-                    <div class="card plan-card" data-id="${p.id}" onclick="selectPlan(${p.id})">
-                        <h4>${p.name}</h4>
-                        <div class="price">₹${p.price.toLocaleString('en-IN')}</div>
-                        <p>${p.duration} day${p.duration > 1 ? 's' : ''}</p>
-                    </div>
-                `;
-            });
-        }
-        
-        function selectPlan(id) {
-            appState.selectedPlanId = id;
-            document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
-            document.querySelector(`.plan-card[data-id="${id}"]`).classList.add('selected');
-
-            const plan = MOCK_PLANS.find(p => p.id === id);
-            const dateRange = Array.from({length: plan.duration}, (_, i) => formatDate(addDays(appState.startDate, i)));
-            
-            // Simulate API check for entire range
-            showApi('planCheck', 'GET /api/v1/locations/:id/check-availability', { query: { startDate: dateRange[0], planId: id } });
-
-            let isRangeAvailable = true;
-            dateRange.forEach(date => {
-                const inventoryForDate = MOCK_INVENTORY[date] || {};
-                const loc = MOCK_LOCATIONS.find(l => l.id === appState.selectedLocationId);
-                const booked = inventoryForDate[loc.id] || 0;
-                if (loc.total_slots - booked <= 0) {
-                    isRangeAvailable = false;
-                }
-            });
-            
-            if (!isRangeAvailable) {
-                apiBoxes.planCheck.innerHTML += `<div class="error-box" style="margin-top:10px;">API Response: { "is_available": false }</div>`;
-                document.getElementById('summary-section').classList.add('hidden');
-                alert(`Error: This location is sold out for one or more days in the selected ${plan.duration}-day range. Please choose a different start date or plan.`);
-                return;
-            } else {
-                apiBoxes.planCheck.innerHTML += `<div class="success-box" style="margin-top:10px;">API Response: { "is_available": true }</div>`;
-            }
-
-            // Populate summary
-            const loc = MOCK_LOCATIONS.find(l => l.id === appState.selectedLocationId);
-            const endDate = addDays(appState.startDate, plan.duration - 1);
-            document.getElementById('summary-location').innerText = loc.name;
-            document.getElementById('summary-plan').innerText = plan.name;
-            document.getElementById('summary-duration').innerText = `${plan.duration} day${plan.duration > 1 ? 's' : ''}`;
-            document.getElementById('summary-dates').innerText = `${formatDate(appState.startDate)} to ${formatDate(endDate)}`;
-            document.getElementById('summary-total').innerText = `₹${plan.price.toLocaleString('en-IN')}`;
-            document.getElementById('summary-section').classList.remove('hidden');
-        }
-
-        function proceedToPayment() {
-            const plan = MOCK_PLANS.find(p => p.id === appState.selectedPlanId);
-            appState.orderId = 'ORD' + Date.now();
-            appState.razorpayOrderId = 'order_' + Math.random().toString(36).substr(2, 9);
-            
-            showApi('initiate', 'POST /api/v1/orders/initiate', {
-                body: {
-                    locationId: appState.selectedLocationId,
-                    planId: appState.selectedPlanId,
-                    startDate: formatDate(appState.startDate)
-                },
-                response: {
-                    orderId: appState.orderId,
-                    razorpayOrderId: appState.razorpayOrderId
-                },
-                comment: "// Slot is NOT booked yet. Only an order record with 'Pending Payment' status is created."
-            });
-            
-            document.getElementById('payment-order-id').innerText = appState.orderId;
-            document.getElementById('payment-amount').innerText = `₹${plan.price.toLocaleString('en-IN')}`;
-            showScreen('payment');
-        }
-
-        function handlePaymentSuccess() {
-             showApi('verify', 'POST /api/v1/orders/verify-payment', {
-                body: {
-                    orderId: appState.orderId,
-                    razorpay_payment_id: "pay_" + Math.random().toString(36).substr(2, 9)
-                },
-                comment: "// Backend verifies payment signature, then performs ATOMIC transaction: 1. LOCK inventory rows. 2. RE-CHECK availability. 3. UPDATE inventory. 4. UPDATE order status to 'Pending Approval'. 5. COMMIT."
-            });
-
-            screens.confirmation.innerHTML = `
-                <div class="success-box">
-                    <h2>Booking Confirmed!</h2>
-                    <p>Your order <strong>${appState.orderId}</strong> has been placed successfully.</p>
-                    <p>Status: Pending Approval</p>
-                </div>
-                <div id="api-verify" class="api-simulation">... (See above) ...</div>
-            `;
-            showScreen('confirmation');
-        }
-        
-        function handlePaymentConflict() {
-             showApi('verify', 'POST /api/v1/orders/verify-payment', {
-                body: { orderId: appState.orderId, /*...*/ },
-                comment: "// Payment signature is VALID. Backend begins ATOMIC transaction...",
-                "DB Transaction Fails": "Another user booked the last slot. The final inventory check fails. Transaction is ROLLED BACK.",
-                "Backend Final Actions": [
-                    "Calls Razorpay API to automatically refund the payment.",
-                    "Updates order status to 'Cancelled (Inventory Conflict)'.",
-                    "Returns 409 Conflict error to frontend."
-                ]
-            });
-
-             screens.confirmation.innerHTML = `
-                <div class="error-box">
-                    <h2>Booking Failed</h2>
-                    <p>We're sorry, the selected slot was booked by another user while you were completing payment.</p>
-                    <p><strong>Your payment has been automatically refunded.</strong></p>
-                    <p>Please try booking again.</p>
-                </div>
-                <div id="api-verify" class="api-simulation">... (See above) ...</div>
-            `;
-            showScreen('confirmation');
-        }
-
-        function handlePaymentDeclined() {
-            showApi('initiate', 'POST /api/v1/orders/initiate (Recap)', {
-                comment: "// The 'Pending Payment' order record (ID: "+ appState.orderId +") remains in the database. Inventory was NOT affected. A cleanup job will mark this order as 'Expired' after 30 minutes."
-            });
-            screens.confirmation.innerHTML = `
-                <div class="error-box">
-                    <h2>Payment Declined</h2>
-                    <p>Your payment was not successful. Your booking has not been confirmed.</p>
-                    <p>You can try the payment again or start a new booking.</p>
-                </div>
-                 <div id="api-verify" class="api-simulation">... (See recap above) ...</div>
-            `;
-            showScreen('confirmation');
-        }
-
-
-        // --- EVENT LISTENERS ---
-        document.getElementById('start-date').addEventListener('change', handleDateChange);
-        document.getElementById('btn-proceed-to-payment').addEventListener('click', proceedToPayment);
-        document.getElementById('btn-payment-success').addEventListener('click', handlePaymentSuccess);
-        document.getElementById('btn-payment-fail-conflict').addEventListener('click', handlePaymentConflict);
-        document.getElementById('btn-payment-fail-declined').addEventListener('click', handlePaymentDeclined);
-        
-        // --- INITIALIZATION ---
-        showScreen('location');
-
-    </script>
-</body>
-</html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office" lang="und"><head><meta content="width=device-width, initial-scale=1" name="viewport"><meta charset="UTF-8"><meta name="x-apple-disable-message-reformatting"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta content="telephone=no" name="format-detection"><title></title>
+ <!--[if (mso 16)]>
+    <style type="text/css"> a {text-decoration: none;} 
+</style>
+    <![endif]--><!--[if gte mso 9]><style>sup { font-size: 100% !important; }</style><![endif]--><!--[if gte mso 9]>
+<noscript>
+         <xml>
+           <o:OfficeDocumentSettings>
+           <o:AllowPNG></o:AllowPNG>
+           <o:PixelsPerInch>96</o:PixelsPerInch>
+           </o:OfficeDocumentSettings>
+         </xml>
+      </noscript>
+<![endif]--><!--[if mso]><xml>
+    <w:WordDocument xmlns:w="urn:schemas-microsoft-com:office:word">
+      <w:DontUseAdvancedTypographyReadingMail></w:DontUseAdvancedTypographyReadingMail>
+    </w:WordDocument>
+    </xml><![endif]--><style type="text/css">#outlook a {	padding:0;}a[x-apple-data-detectors] {	color:inherit!important;	text-decoration:none!important;	font-size:inherit!important;	font-family:inherit!important;	font-weight:inherit!important;	line-height:inherit!important;}.es-desk-hidden {	display:none;	float:left;	overflow:hidden;	width:0;	max-height:0;	line-height:0;	mso-hide:all;}.es-left {	float:left;}.es-right {	float:right;}.es-p5 {	padding:5px;}.es-p5t {	padding-top:5px;}.es-p5b {	padding-bottom:5px;}.es-p5l {	padding-left:5px;}.es-p10t {	padding-top:10px;}.es-p10b {	padding-bottom:10px;}.es-p10l {	padding-left:10px;}.es-p10r {	padding-right:10px;}.es-p15 {	padding:15px;}.es-p15t {	padding-top:15px;}.es-p15b {	padding-bottom:15px;}.es-p15l {	padding-left:15px;}.es-p15r {	padding-right:15px;}.es-p20 {	padding:20px;}.es-p20b {	padding-bottom:20px;}.es-p25 {	padding:25px;}.es-p25t {	padding-top:25px;}.es-p25b {	padding-bottom:25px;}.es-p25l {	padding-left:25px;}.es-p25r {	padding-right:25px;}.es-p30 {	padding:30px;}.es-p30t {	padding-top:30px;}.es-p30b {	padding-bottom:30px;}.es-p30l {	padding-left:30px;}.es-p30r {	padding-right:30px;}.es-p35 {	padding:35px;}.es-p35t {	padding-top:35px;}.es-p35b {	padding-bottom:35px;}.es-p35l {	padding-left:35px;}.es-p35r {	padding-right:35px;}.es-p40 {	padding:40px;}.es-p40t {	padding-top:40px;}.es-p40b {	padding-bottom:40px;}.es-p40l {	padding-left:40px;}.es-p40r {	padding-right:40px;}.es-menu td {	border:0;}.es-menu td a img {	display:inline-block!important;	vertical-align:middle;}s {	text-decoration:line-through;}.es-menu td a {	text-decoration:none;	display:block;	font-family:arial, "helvetica neue", helvetica, sans-serif;}.es-header {	background-color:transparent;	background-repeat:repeat;	background-position:center top;}.es-header-body {	background-color:transparent;}.es-header-body p, .es-header-body ul li, .es-header-body ol li {	color:rgb(51, 51, 51);	font-size:14px;}.es-header-body a {	color:rgb(19, 118, 200);	font-size:14px;}.es-infoblock, .es-infoblock p, .es-infoblock ul li, .es-infoblock ol li {	line-height:120%;	font-size:12px;	color:rgb(204, 204, 204);}.es-infoblock a {	font-size:12px;	color:rgb(44, 181, 67);}h2 {	font-size:24px;	font-style:normal;	font-weight:normal;	color:rgb(51, 51, 51);}h3 {	font-size:20px;	font-style:normal;	font-weight:normal;	color:rgb(51, 51, 51);}.es-header-body h1 a, .es-content-body h1 a, .es-footer-body h1 a {	font-size:30px;}.es-header-body h2 a, .es-content-body h2 a, .es-footer-body h2 a {	font-size:24px;}.es-header-body h3 a, .es-content-body h3 a, .es-footer-body h3 a {	font-size:20px;}.es-p-default {	padding-top:0px;	padding-right:0px;	padding-bottom:0px;	padding-left:0px;}.es-p-all-default {	padding:0px;}@media only screen and (max-width:600px) {p, ul li, ol li, a { line-height:150%!important } h1, h2, h3, h1 a, h2 a, h3 a { line-height:120%!important } h1 { font-size:30px!important; text-align:center } h2 { font-size:26px!important; text-align:center } h3 { font-size:20px!important; text-align:center } .es-header-body h1 a, .es-content-body h1 a, .es-footer-body h1 a { font-size:30px!important } .es-header-body h2 a, .es-content-body h2 a, .es-footer-body h2 a { font-size:26px!important } .es-header-body h3 a, .es-content-body h3 a, .es-footer-body h3 a { font-size:20px!important } .es-menu td a { font-size:16px!important } .es-header-body p, .es-header-body ul li, .es-header-body ol li, .es-header-body a { font-size:26px!important } .es-content-body p, .es-content-body ul li, .es-content-body ol li, .es-content-body a { font-size:16px!important } .es-footer-body p, .es-footer-body ul li, .es-footer-body ol li, .es-footer-body a { font-size:16px!important } .es-infoblock p, .es-infoblock ul li, .es-infoblock ol li, .es-infoblock a { font-size:12px!important } *[class="gmail-fix"] { display:none!important } .es-m-txt-c, .es-m-txt-c h1, .es-m-txt-c h2, .es-m-txt-c h3 { text-align:center!important } .es-m-txt-r, .es-m-txt-r h1, .es-m-txt-r h2, .es-m-txt-r h3 { text-align:right!important } .es-m-txt-l, .es-m-txt-l h1, .es-m-txt-l h2, .es-m-txt-l h3 { text-align:left!important } .es-m-txt-r img, .es-m-txt-c img, .es-m-txt-l img { display:inline!important } .es-button-border { display:inline-block!important } a.es-button, button.es-button { font-size:20px!important; display:inline-block!important } .es-adaptive table, .es-left, .es-right { width:100%!important } .es-content table, .es-header table, .es-footer table, .es-content, .es-footer, .es-header { width:100%!important; max-width:600px!important } .es-adapt-td { display:block!important; width:100%!important } .adapt-img { width:100%!important; height:auto!important } .es-m-p0 { padding:0!important } .es-m-p0r { padding-right:0!important } .es-m-p0l { padding-left:0!important } .es-m-p0t { padding-top:0!important } .es-m-p0b { padding-bottom:0!important } .es-m-p20b { padding-bottom:20px!important } .es-mobile-hidden, .es-hidden { display:none!important } tr.es-desk-hidden, td.es-desk-hidden, table.es-desk-hidden { width:auto!important; overflow:visible!important; float:none!important; max-height:inherit!important; line-height:inherit!important } tr.es-desk-hidden { display:table-row!important } table.es-desk-hidden { display:table!important } td.es-desk-menu-hidden { display:table-cell!important } .es-menu td { width:1%!important } table.es-table-not-adapt, .esd-block-html table { width:auto!important } table.es-social { display:inline-block!important } table.es-social td { display:inline-block!important } .es-desk-hidden { display:table-row!important; width:auto!important; overflow:visible!important; max-height:inherit!important } .h-auto { height:auto!important } .es-m-p5 { padding:5px!important } .es-m-p5t { padding-top:5px!important } .es-m-p5b { padding-bottom:5px!important } .es-m-p5r { padding-right:5px!important } .es-m-p5l { padding-left:5px!important } .es-m-p10 { padding:10px!important } .es-m-p10t { padding-top:10px!important } .es-m-p10b { padding-bottom:10px!important } .es-m-p10r { padding-right:10px!important } .es-m-p10l { padding-left:10px!important } .es-m-p15 { padding:15px!important } .es-m-p15t { padding-top:15px!important } .es-m-p15b { padding-bottom:15px!important } .es-m-p15r { padding-right:15px!important } .es-m-p15l { padding-left:15px!important } .es-m-p20 { padding:20px!important } .es-m-p20t { padding-top:20px!important } .es-m-p20r { padding-right:20px!important } .es-m-p20l { padding-left:20px!important } .es-m-p25 { padding:25px!important } .es-m-p25t { padding-top:25px!important } .es-m-p25b { padding-bottom:25px!important } .es-m-p25r { padding-right:25px!important } .es-m-p25l { padding-left:25px!important } .es-m-p30 { padding:30px!important } .es-m-p30t { padding-top:30px!important } .es-m-p30b { padding-bottom:30px!important } .es-m-p30r { padding-right:30px!important } .es-m-p30l { padding-left:30px!important } .es-m-p35 { padding:35px!important } .es-m-p35t { padding-top:35px!important } .es-m-p35b { padding-bottom:35px!important } .es-m-p35r { padding-right:35px!important } .es-m-p35l { padding-left:35px!important } .es-m-p40 { padding:40px!important } .es-m-p40t { padding-top:40px!important } .es-m-p40b { padding-bottom:40px!important } .es-m-p40r { padding-right:40px!important } .es-m-p40l { padding-left:40px!important } }@media screen and (max-width:384px) {.mail-message-content { width:414px!important } }</style>
+ </head>
+ <body style="width:100%;font-family:arial, 'helvetica neue', helvetica, sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;padding:0;Margin:0"><div class="es-wrapper-color" lang="und" style="background-color:#F6F6F6"><!--[if gte mso 9]>
+			<v:background xmlns:v="urn:schemas-microsoft-com:vml" fill="t">
+				<v:fill type="tile" color="#f6f6f6"></v:fill>
+			</v:background>
+		<![endif]--><table cellpadding="0" cellspacing="0" class="es-wrapper" width="100%" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;padding:0;Margin:0;width:100%;height:100%;background-repeat:repeat;background-position:center top;background-color:#F6F6F6"><tr><td valign="top" style="padding:0;Margin:0"><table cellpadding="0" cellspacing="0" class="es-content" align="center" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;table-layout:fixed !important;width:100%"><tr><td align="center" style="padding:0;Margin:0"><table class="es-content-body" align="center" cellpadding="0" cellspacing="0" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:transparent;width:600px" role="none"><tr><td align="left" style="padding:0;Margin:0"><table cellpadding="0" cellspacing="0" width="100%" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td align="center" valign="top" style="padding:0;Margin:0;width:600px"><table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td align="center" style="padding:0;Margin:0;font-size:0px"><img class="adapt-img" src="https://fwlji.stripocdnplugin.email/content/86b78466a2f841edb141ff11668da4ec/lib/pluginId_86b78466a2f841edb141ff11668da4ec_email_463966/white_Zi97g7T2an45TbTJ.png" alt="" style="display:block;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic" height="125"></td>
+ </tr></table></td></tr></table></td></tr></table></td></tr></table>
+ <table cellpadding="0" cellspacing="0" class="es-content" align="center" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;table-layout:fixed !important;width:100%"><tr><td align="center" style="padding:0;Margin:0"><table class="es-content-body" align="center" cellpadding="0" cellspacing="0" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:#FFFFFF;width:600px"><tr><td align="left" style="padding:0;Margin:0;padding-top:20px;padding-left:20px;padding-right:20px"><table cellpadding="0" cellspacing="0" width="100%" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td align="center" valign="top" style="padding:0;Margin:0;width:560px"><table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td align="center" style="padding:0;Margin:0"><h1 style="Margin:0;line-height:33.6px;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;font-size:28px;font-style:normal;font-weight:normal;color:#333333"><strong>Thank you for your order!</strong></h1>
+</td></tr></table></td></tr></table></td></tr></table></td></tr></table>
+ <table cellpadding="0" cellspacing="0" class="es-footer" align="center" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;table-layout:fixed !important;width:100%;background-color:transparent;background-repeat:repeat;background-position:center top"><tr><td align="center" style="padding:0;Margin:0"><table class="es-footer-body" align="center" cellpadding="0" cellspacing="0" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:transparent;width:600px" role="none"><tr><td align="left" bgcolor="#ffffff" style="padding:0;Margin:0;background-color:#ffffff"><table cellpadding="0" cellspacing="0" width="100%" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td align="center" valign="top" style="padding:0;Margin:0;width:600px"><table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td align="left" style="padding:10px;Margin:0"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px"><br></p>
+<p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px">Hey&nbsp;<b>{{CUSTOMER_NAME}}</b>,</p></td></tr><tr><td align="left" style="padding:10px;Margin:0"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px">Thank you for your order at <strong>AdScreenHub</strong>! We are thrilled to have your ad join our network of vibrant, eye-catching screens. Your order has been successfully placed, and your ad creative is currently pending approval. Our AI agent is now reviewing it to ensure everything is perfect before it goes live to the world.</p></td></tr>
+ <tr><td align="left" style="padding:10px;Margin:0"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:14px;color:#000000;font-size:14px">Your Order Summary:</p><ul> <li style="-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:14px;Margin-bottom:15px;margin-left:0;color:#000000;font-size:11px"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:14px;color:#000000;font-size:14px"><strong>Order ID:</strong> {{ORDER_ID}}</p></li> 
+<li style="-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:14px;Margin-bottom:15px;margin-left:0;color:#000000;font-size:11px"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:14px;color:#000000;font-size:14px"><strong>Start Date:</strong> {{start_date}}</p></li> 
+<li style="-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:14px;Margin-bottom:15px;margin-left:0;color:#000000;font-size:11px"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:14px;color:#000000;font-size:14px"><strong>Screen Location:</strong> {{location_name}}</p></li> 
+<li style="-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:14px;Margin-bottom:15px;margin-left:0;color:#000000;font-size:11px"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:14px;color:#000000;font-size:14px"><strong>Plan</strong>: {{plan_name}}</p></li> 
+<li style="-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:14px;Margin-bottom:15px;margin-left:0;color:#000000;font-size:11px"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:14px;color:#000000;font-size:14px"><strong>Total Amount:</strong> ₹&nbsp;{{gross_amount}}</p></li> </ul></td></tr>
+ <tr><td align="left" style="padding:10px;Margin:0"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px"><strong>Important: Your ad is sent for approval. If any changes are required, you will be notified via email. Please monitor both your inbox and spam folder. Your ad will not be displayed if it is not approved.</strong></p><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px"><br></p>
+<p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px">You can check the current status of your order anytime by clicking the following button:</p></td></tr>
+ <tr><td align="center" style="padding:0;Margin:0"><span class="es-button-border" style="border-style:solid;border-color:#2CB543;background:#31cb4b;border-width:0px 0px 2px 0px;display:inline-block;border-radius:30px;width:auto;border-bottom-width:0px"><a href="{{ORDER_LINK}}" class="es-button" target="_blank" style="mso-style-priority:100 !important;text-decoration:none;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;color:#FFFFFF;font-size:18px;display:inline-block;background:#31CB4B;border-radius:30px;font-family:arial, 'helvetica neue', helvetica, sans-serif;font-weight:normal;font-style:normal;line-height:21.6px;width:auto;text-align:center;padding:10px 20px 10px 20px;mso-padding-alt:0;mso-border-alt:10px solid #31CB4B">Order Link</a></span></td></tr>
+ <tr><td align="left" style="padding:10px;Margin:0"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px">You can download your invoice by clicking the following button:</p></td></tr></table></td></tr></table></td></tr></table></td></tr></table>
+ <table cellpadding="0" cellspacing="0" class="es-footer" align="center" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;table-layout:fixed !important;width:100%;background-color:transparent;background-repeat:repeat;background-position:center top"><tr><td align="center" style="padding:0;Margin:0"><table class="es-footer-body" align="center" cellpadding="0" cellspacing="0" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:transparent;width:600px" role="none"><tr><td align="left" bgcolor="#ffffff" style="padding:0;Margin:0;background-color:#ffffff"><table cellpadding="0" cellspacing="0" width="100%" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td align="center" valign="top" style="padding:0;Margin:0;width:600px"><table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td align="center" style="padding:0;Margin:0"><span class="es-button-border" style="border-style:solid;border-color:#007bff;background:#007bff;border-width:0px 0px 2px 0px;display:inline-block;border-radius:30px;width:auto;border-bottom-width:0px"><a href="{{invoiceUrl}}" class="es-button" target="_blank" style="mso-style-priority:100 !important;text-decoration:none;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;color:#FFFFFF;font-size:18px;display:inline-block;background:#007bff;border-radius:30px;font-family:arial, 'helvetica neue', helvetica, sans-serif;font-weight:normal;font-style:normal;line-height:21.6px;width:auto;text-align:center;padding:10px 20px 10px 20px;mso-padding-alt:0;mso-border-alt:10px solid #007bff">Download Invoice </a>
+</span></td></tr><tr><td align="left" style="padding:10px;Margin:0"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px"><br></p><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px"><strong>What’s next?</strong></p><ul> 
+<li style="-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;Margin-bottom:15px;margin-left:0;color:#333333;font-size:11px"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#333333;font-size:14px"><strong>Approval</strong>: If your ad is approved, it will be scheduled to run on your selected screen. If rejected, you will be notified with the reason and you can resubmit an adjusted design for approval via "My Orders" on AdscreenHub.com</p></li> 
+<li style="-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;Margin-bottom:15px;margin-left:0;color:#333333;font-size:11px"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#333333;font-size:14px"><strong>Resubmission</strong>: Adjusted ads are sent for re-approval, once approved, your ad will be scheduled to run at the selected date and location. The deadline for all resubmissions is 12:00 PM on the day prior to the start date of your ad.</p></li> 
+<li style="-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;Margin-bottom:15px;margin-left:0;color:#333333;font-size:11px"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#333333;font-size:14px"><strong>Post-launch</strong>: After your ad goes live during the day, we will provide an image showing your ad and a map of the screen location.</p></li> </ul>
+<p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px">We are here to make advertising simple, impactful, and seamless. If you have any questions, reach out to us at info@adscreenhub.com.</p><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px"><br></p><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px">Thanks for trusting us with bringing your message to life.</p>
+<p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px"><br></p><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:21px;color:#000000;font-size:14px">See you on the big screen,<br><strong>The AdScreenHub Team</strong></p></td></tr><tr><td align="center" bgcolor="#bde9fb" style="padding:0;Margin:0"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:16.5px;color:#333333;font-size:11px;white-space:nowrap">📧 info@adscreenhub.com</p>
+<p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:16.5px;color:#333333;font-size:11px;white-space:nowrap">🌐 www.adscreenhub.com</p></td></tr><tr><td align="center" style="padding:10px;Margin:0;font-size:0" bgcolor="#bde9fb"><table border="0" width="80%" height="100%" cellpadding="0" cellspacing="0" role="presentation" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td style="padding:0;Margin:0;border-bottom:1px solid #cccccc;background:none;height:1px;width:100%;margin:0px"></td></tr></table></td></tr>
+ <tr><td align="center" style="padding:0;Margin:0;font-size:0px;background-color:#bde9fb" bgcolor="#bde9fb"><table cellpadding="0" cellspacing="0" class="es-table-not-adapt es-social" dir="ltr" role="presentation" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td align="center" valign="top" style="padding:0;Margin:0;padding-right:5px"><a target="_blank" href="https://www.facebook.com/adscreenhub" style="-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;text-decoration:underline;color:#2CB543;font-size:11px"><img src="https://fwlji.stripocdnplugin.email/content/assets/img/social-icons/logo-white/facebook-logo-white.png" alt="Fb" title="Facebook" width="32" height="32" style="display:block;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic"></a></td>
+ <td align="center" valign="top" style="padding:0;Margin:0"><a target="_blank" href="https://www.instagram.com/adscreenhub" style="-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;text-decoration:underline;color:#2CB543;font-size:11px"><img src="https://fwlji.stripocdnplugin.email/content/assets/img/social-icons/logo-white/instagram-logo-white.png" alt="Ig" title="Instagram" width="32" height="32" style="display:block;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic"></a></td></tr></table></td></tr></table></td></tr></table></td></tr></table></td></tr></table>
+ <table cellpadding="0" cellspacing="0" class="es-content" align="center" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;table-layout:fixed !important;width:100%"><tr><td align="center" style="padding:0;Margin:0"><table class="es-content-body" align="center" cellpadding="0" cellspacing="0" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:transparent;width:600px" role="none"><tr><td align="left" style="padding:0;Margin:0"><table cellpadding="0" cellspacing="0" width="100%" role="none" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td align="center" valign="top" style="padding:0;Margin:0;width:600px"><table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px"><tr><td align="center" bgcolor="#bde9fb" style="padding:0;Margin:0"><p style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:arial, 'helvetica neue', helvetica, sans-serif;line-height:16.5px;color:#333333;font-size:11px">© 2025 ADSCREENHUB. All rights reserved.</p>
+</td></tr></table></td></tr></table></td></tr></table></td></tr></table></td></tr></table></div></body></html>

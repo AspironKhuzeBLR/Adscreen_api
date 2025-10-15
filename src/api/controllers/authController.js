@@ -825,21 +825,15 @@ const completePhoneUpdate = asyncHandler(async (req, res) => {
     );
 });
 
-// src/api/controllers/authController.js
 
 const deleteAccount = asyncHandler(async (req, res) => {
   const { password } = req.body;
   const userId = req.user.id;
 
-  const userJwt = req.headers.authorization?.split(' ')[1];
   if (!password) {
     throw new ApiError(400, "Password is required to confirm account deletion.");
   }
-  if (!userId) {
-    throw new ApiError(401, "User not authenticated.");
-  }
 
-  // 2. --- FETCH USER EMAIL FOR PASSWORD VERIFICATION ---
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("email")
@@ -850,8 +844,7 @@ const deleteAccount = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User profile not found.");
   }
 
-  // 3. --- VERIFY USER'S PASSWORD TO AUTHORIZE DELETION ---
-  // This is a crucial security step to ensure the account owner is the one deleting.
+  // 2. --- VERIFY PASSWORD ---
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email: profile.email,
     password: password,
@@ -865,41 +858,68 @@ const deleteAccount = asyncHandler(async (req, res) => {
     );
   }
 
-  // 4. --- PERFORM SOFT DELETE ON THE PROFILE ---
-  // Instead of deleting, we UPDATE the profile to mark it as deleted.
-  // This preserves the record for historical data (like orders) while making it inactive.
-  const { error: softDeleteError } = await supabase
+  // 3. --- ANONYMIZE PROFILE DATA (The "Soft" part for DB integrity) ---
+  // We must change the email in profiles to free it up if there's a unique constraint,
+  // and to ensure PII is removed.
+  const timestamp = Date.now();
+  const anonymizedEmail = `deleted_${userId.slice(0, 8)}_${timestamp}@inactive.local`;
+
+  const { error: anonymizeError } = await supabase
     .from("profiles")
-    .update({ deleted_at: new Date().toISOString() }) // Set the deleted_at timestamp
+    .update({
+      email: anonymizedEmail,
+      phone_number: null, // Assuming column allows NULL. If not, use a unique dummy format like `0000000000_${timestamp}`
+      full_name: "Deleted User",
+      gst_info: null, // Scrub other PII
+      deleted_at: new Date().toISOString(),
+    })
     .eq("id", userId);
 
-  if (softDeleteError) {
-    console.error(
-      "Failed to soft-delete user profile, aborting account deletion:",
-      softDeleteError
-    );
+  if (anonymizeError) {
+    console.error("Failed to anonymize user profile:", anonymizeError);
     throw new ApiError(
       500,
-      "Could not update user profile for deletion. Please try again.",
-      softDeleteError
+      "Could not process account deletion. Please try again.",
+      anonymizeError
     );
   }
 
-  // This effectively logs them out everywhere and prevents them from getting a new session token.
-  const { error: signOutError } = await supabase.auth.admin.signOut(userJwt);
-  
-  if (signOutError) {
-      // This is a critical error to log, as the user might still have an active session.
-      // However, RLS policies (Step 2) will be our final line of defense.
-      console.error(`CRITICAL: User profile ${userId} was soft-deleted but failed to sign out globally.`, signOutError);
+  // 4. --- HARD DELETE FROM SUPABASE AUTH ---
+  // This frees up the original email and phone for re-registration.
+  // Use admin API to bypass RLS and ensure deletion.
+  const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(userId);
+
+  if (deleteAuthError) {
+    // CRITICAL SCENARIO: Profile is anonymized, but Auth user still exists.
+    // User won't be able to login (email changed in profile, need to check logic),
+    // but also can't re-register.
+    console.error(
+      `CRITICAL: Profile anonymized for ${userId}, but Auth deletion failed. Manual intervention required.`,
+      deleteAuthError
+    );
+    
+    // Ideally, rollback step 3 here, but supabase-js doesn't support multi-step transactions easily without RPC.
+    // For now, throw error instructing user to contact support.
+    throw new ApiError(
+      500,
+      "An error occurred during final deletion. Please contact support.",
+      deleteAuthError
+    );
   }
 
+  // 5. --- CLEANUP VERIFICATIONS (Optional but recommended) ---
+  // Delete pending OTPs/links associated with the anonymized profile to keep DB clean.
+  await supabase
+      .from("verifications")
+      .delete()
+      .eq("user_id", userId); // Assuming verifications has user_id, or use the old email before anonymizing.
+
   // 6. --- RESPOND WITH SUCCESS ---
-  // The message now accurately reflects that the account is deactivated/deleted, not just "permanently erased".
   res
     .status(200)
-    .json(new ApiResponse(200, null, "Your account has been successfully deleted."));
+    .json(new ApiResponse(200, null, "Your account has been permanently deleted. You may register again as a new user."));
 });
+
 
 module.exports = {
   startPhoneVerification,

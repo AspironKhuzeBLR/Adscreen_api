@@ -98,10 +98,13 @@ const sendEmail = async (templateId, recipientEmail, variables) => {
         template_id: templateId,
         recipients: [{ to: [{ email: recipientEmail }], variables }],
         from: { name: FROM_NAME, email: FROM_EMAIL },
+
     };
+
     const headers = { 'authkey': AUTH_KEY, 'Content-Type': 'application/json' };
 
     try {
+        console.log("Payload:", payload);
         await axios.post(url, payload, { headers });
         return true;
     } catch (error) {
@@ -133,7 +136,6 @@ const sendPasswordResetLink = async (email, customerName, resetLink) => {
 };
 const sendOrderConfirmationEmail = async (orderDetails, recipientEmail, customerName) => {
     const ORDER_CONFIRM_TPL_ID = process.env.MSG91_ORDER_CONFIRMATION_TPL_ID;
-
     const orderLink = `${process.env.FRONTEND_URL}/my-orders`; 
 
     const variables = {
@@ -144,12 +146,15 @@ const sendOrderConfirmationEmail = async (orderDetails, recipientEmail, customer
         plan_name: orderDetails.plan_name,
         gross_amount: orderDetails.final_amount || orderDetails.total_cost, 
         ORDER_LINK: orderLink,
+        invoiceUrl: orderDetails.invoiceUrl,
+
     };
 
     console.log(`Sending order confirmation for order ID ${orderDetails.id} to ${recipientEmail}`);
+    
+    // Pass attachments to the base sender function
     return sendEmail(ORDER_CONFIRM_TPL_ID, recipientEmail, variables);
 };
-
 
 const sendContactUserConfirmationEmail = async (recipientEmail, formData) => {
     const CONTACT_USER_CONFIRM_TPL_ID = process.env.MSG91_CONTACT_USER_CONFIRM_TPL_ID;

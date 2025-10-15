@@ -25,12 +25,11 @@ const getPlansForLocation = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Location ID is required.");
     }
 
-    // This query fetches all plans that have a valid price for the given location.
     const { data, error } = await supabase
         .from('location_plan_pricing')
         .select(`
             price,
-            plans ( id, name, description, duration_days )
+            plans ( id, name, description, duration_days, features )
         `)
         .eq('location_id', locationId)
         .eq('is_active', true);

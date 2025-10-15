@@ -5,6 +5,7 @@ const asyncHandler = require("../../utils/asyncHandler");
 const ApiError = require("../../utils/ApiError");
 const ApiResponse = require("../../utils/ApiResponse");
 const msg91Service = require("../services/msg91Services");
+const {generateInvoicePDF} = require("../services/invoiceServices"); // Import the invoice generation service
 
 
 const razorpay = new Razorpay({
@@ -52,7 +53,7 @@ const initiateOrder = asyncHandler(async (req, res) => {
     const durationDays = planDetails.plans.duration_days;
     const verifiedPrice = planDetails.price;
 
-    const orderUID = `ORD-${nanoid(12).toUpperCase()}`;
+    const orderUID = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
     
     const totalAmountIncludingGST = (verifiedPrice * 1.18);
     const totalAmountInPaise = Math.round(totalAmountIncludingGST * 100);
@@ -73,7 +74,7 @@ const initiateOrder = asyncHandler(async (req, res) => {
     .getPublicUrl(creativeFilePath);
 
     const publicUrl = urlData.publicUrl;
-
+    
     const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
         user_id: userId,
         plan_id: planId,
@@ -81,7 +82,7 @@ const initiateOrder = asyncHandler(async (req, res) => {
         start_date: startDate,
         end_date: endDateString,
         total_cost: price, 
-        final_amount: price, 
+        final_amount: totalAmountIncludingGST, 
         delivery_address: deliveryAddress,
         gst_info: gstInfo,
         status: 'Pending Payment',
@@ -93,8 +94,8 @@ const initiateOrder = asyncHandler(async (req, res) => {
     if (orderError) {
         throw new ApiError(500, "Could not create the initial order record.", orderError);
     }
-    
-    
+
+    console.log("New order created:", newOrder);
     const { error: creativeError } = await supabase.from('creatives').insert({
         order_id: newOrder.id,
         user_id: userId,
@@ -109,7 +110,6 @@ const initiateOrder = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Could not link the creative file to the order. The order has been cancelled.", creativeError);
     }
         
-    // 8. SEND the final response (no change here)
     res.status(200).json(new ApiResponse(200, {
         order: newOrder,
         razorpayOrder: rpOrder
@@ -169,6 +169,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
     
     switch (rpcResult) {
         case 'SUCCESS':
+            console.log("Success from rpc",rpcResult);
            
             await handleSuccessfulPayment({ orderId, razorpay_payment_id, razorpay_signature });
 
@@ -202,6 +203,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
             throw new ApiError(500, "A critical server error occurred while confirming your booking. Please contact support immediately.");
     }
 });
+
 const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_signature }) => {
     await supabase.from('orders').update({
         razorpay_payment_id,
@@ -209,12 +211,11 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
         status: 'Pending Approval'
     }).eq('id', orderId);
 
-
     const { data: fullOrderDetails, error: detailsError } = await supabase
         .from('orders')
         .select(`
             *,
-            profiles ( full_name, email ),
+            profiles ( full_name, email , phone_number),
             locations ( name ),
             plans ( name )
         `)
@@ -222,25 +223,58 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
         .single();
 
     if (detailsError || !fullOrderDetails) {
-
-        console.error(`CRITICAL: Failed to fetch details for order ${orderId} after successful payment. Email not sent.`, detailsError);
+        console.error(`CRITICAL: Failed to fetch details for order ${orderId} after successful payment. Email and invoice not sent.`, detailsError);
         return; 
     }
+  try {
+        // 1. Generate the PDF Buffer (This part is correct and stays)
+        console.log(`Generating invoice for order ${orderId}...`);
+        console.log("Order Details:", fullOrderDetails);
+        const pdfBuffer = await generateInvoicePDF(fullOrderDetails);
 
-    try {
-        const orderDataForEmail = {
-            ...fullOrderDetails,
-            location_name: fullOrderDetails.locations.name,
-            plan_name: fullOrderDetails.plans.name
-        };
+        // --- NEW LOGIC: UPLOAD INSTEAD OF ATTACHING ---
+
+        // 2. Define a unique file path for the invoice in Supabase Storage
+        const invoiceFileName = `${fullOrderDetails.order_uid}.pdf`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('invoice') // Assumes you have a bucket named 'invoices'
+            .upload(invoiceFileName, pdfBuffer, {
+                contentType: 'application/pdf',
+                upsert: false // Don't overwrite if a file with the same name exists
+            });
+
+        if (uploadError) {
+            // If upload fails, we should still try to send the email without the link
+            console.error(`Failed to upload invoice for order ${orderId}:`, uploadError);
+            throw new ApiError(500, "Failed to store invoice file.");
+        }
+
+        // 3. Get the public URL of the uploaded invoice
+        const { data: urlData } = supabase.storage
+            .from('invoice')
+            .getPublicUrl(invoiceFileName);
         
+        const invoiceUrl = urlData.publicUrl;
+        
+        // --- END OF NEW LOGIC ---
+
+        // 4. Send the confirmation email with the INVOICE_URL variable
         await msg91Service.sendOrderConfirmationEmail(
-            orderDataForEmail,
+            { // Pass down all required data
+                ...fullOrderDetails,
+                location_name: fullOrderDetails.locations.name,
+                plan_name: fullOrderDetails.plans.name,
+                invoiceUrl: invoiceUrl, // Pass the URL as a special variable
+
+            },
             fullOrderDetails.profiles.email,
-            fullOrderDetails.profiles.full_name
+            fullOrderDetails.profiles.full_name,
         );
-    } catch (emailError) {
-        console.error(`Email failed to send for successfully paid order ${orderId}:`, emailError);
+
+        console.log(`Successfully sent order confirmation with invoice link for order ${orderId}.`);
+
+    } catch (processError) {
+        console.error(`Post-payment processing failed for order ${orderId}:`, processError);
     }
 };
 

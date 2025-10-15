@@ -52,8 +52,6 @@ const initiateOrder = asyncHandler(async (req, res) => {
     
     const durationDays = planDetails.plans.duration_days;
     const verifiedPrice = planDetails.price;
-
-    const orderUID = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
     
     const totalAmountIncludingGST = (verifiedPrice * 1.18);
     const totalAmountInPaise = Math.round(totalAmountIncludingGST * 100);
@@ -61,6 +59,14 @@ const initiateOrder = asyncHandler(async (req, res) => {
     const calculatedEndDate = new Date(startDate);
     calculatedEndDate.setDate(calculatedEndDate.getDate() + durationDays - 1);
     const endDateString = calculatedEndDate.toISOString().split('T')[0];
+    // 1. Atomically get the next sequential UID from the database
+    const { data: orderUID, error: uidError } = await supabase.rpc('get_next_order_uid');
+
+    if (uidError || !orderUID) {
+        throw new ApiError(500, "Could not reserve a new Order ID.", uidError);
+    }
+    
+    console.log(`Reserved Order UID: ${orderUID}`);
 
     const rpOrder = await razorpay.orders.create({
         amount: totalAmountInPaise,

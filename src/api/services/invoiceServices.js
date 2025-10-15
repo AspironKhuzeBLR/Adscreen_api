@@ -1,14 +1,14 @@
 const puppeteer = require("puppeteer-core"); // <-- Change this line
 
 const getInvoiceHtml = (orderData) => {
-    // Parse the delivery address from the JSON string
-    const deliveryAddress = JSON.parse(orderData.delivery_address);
+  // Parse the delivery address from the JSON string
+  const deliveryAddress = JSON.parse(orderData.delivery_address);
 
-    // Calculate amounts
-    const taxableAmount = orderData.final_amount / 1.18;
-    const gstAmount = orderData.final_amount - taxableAmount;
+  // Calculate amounts
+  const taxableAmount = orderData.final_amount / 1.18;
+  const gstAmount = orderData.final_amount - taxableAmount;
 
-    const css = `
+  const css = `
         body { 
             font-family: 'Helvetica Neue', 'Helvetica', Arial, sans-serif; 
             color: #333;
@@ -94,7 +94,7 @@ const getInvoiceHtml = (orderData) => {
         }
     `;
 
-    return `
+  return `
     <!doctype html>
     <html>
     <head>
@@ -107,7 +107,7 @@ const getInvoiceHtml = (orderData) => {
             <div class="invoice-header">
                 <div class="company-details">
                     <img src="https://ad-screenhub.netlify.app/logo-2.png" alt="Company Logo" style="max-width: 150px; margin-bottom: 20px;">
-                    <h1>ADSCREENHUB MEDIA</h1>
+                    <h2>ADSCREENHUB MEDIA</h2>
                     <div>Koramangala, Bengaluru - 560095</div>
                     <div><strong>GST:</strong> [Your Company GSTIN]</div>
                     <div><strong>PAN:</strong> [Your Company PAN]</div>
@@ -116,7 +116,9 @@ const getInvoiceHtml = (orderData) => {
                     <h2>TAX INVOICE</h2>
                     <p>
                         <strong>Invoice #:</strong> ${orderData.order_uid}<br>
-                        <strong>Created:</strong> ${new Date(orderData.created_at).toLocaleDateString('en-GB')}
+                        <strong>Created:</strong> ${new Date(
+                          orderData.created_at
+                        ).toLocaleDateString("en-GB")}
                     </p>
                 </div>
             </div>
@@ -130,19 +132,27 @@ const getInvoiceHtml = (orderData) => {
                         <td>${orderData.profiles.full_name}</td>
                     </tr>
                     <tr>
-                        <td>${deliveryAddress.street}, ${deliveryAddress.city}</td>
+                        <td>${deliveryAddress.street}, ${
+    deliveryAddress.city
+  }</td>
                     </tr>
                     <tr>
-                        <td>${deliveryAddress.state} - ${deliveryAddress.zip}</td>
+                        <td>${deliveryAddress.state} - ${
+    deliveryAddress.zip
+  }</td>
                     </tr>
                      <tr>
-                        <td><strong>Email:</strong> ${orderData.profiles.email}</td>
+                        <td><strong>Email:</strong> ${
+                          orderData.profiles.email
+                        }</td>
                     </tr>
                     <tr>
                         <td><strong>GSTIN:</strong> ${orderData.gst_info}</td>
                     </tr>
                       <tr>
-                        <td><strong>Phone Number:</strong> ${orderData.profiles.phone_number}</td>
+                        <td><strong>Phone Number:</strong> ${
+                          orderData.profiles.phone_number
+                        }</td>
                     </tr>
                 </table>
             </div>
@@ -155,10 +165,14 @@ const getInvoiceHtml = (orderData) => {
                     <td class="text-right">Total</td>
                 </tr>
                 <tr class="item">
-                    <td>Subscription for Digital Advertisement Service - ${orderData.plans.name} Plan (${orderData.locations.name})</td>
+                    <td>Subscription for Digital Advertisement Service - ${
+                      orderData.plans.name
+                    } Plan (${orderData.locations.name})</td>
                     <td class="text-right">₹${taxableAmount.toFixed(2)}</td>
                     <td class="text-right">₹${gstAmount.toFixed(2)}</td>
-                    <td class="text-right">₹${orderData.final_amount.toFixed(2)}</td>
+                    <td class="text-right">₹${orderData.final_amount.toFixed(
+                      2
+                    )}</td>
                 </tr>
             </table>
             
@@ -173,7 +187,9 @@ const getInvoiceHtml = (orderData) => {
                 </tr>
                 <tr class="total">
                     <td>Grand Total:</td>
-                    <td class="text-right">₹${orderData.final_amount.toFixed(2)}</td>
+                    <td class="text-right">₹${orderData.final_amount.toFixed(
+                      2
+                    )}</td>
                 </tr>
             </table>
 
@@ -182,58 +198,66 @@ const getInvoiceHtml = (orderData) => {
             <div class="footer">
                 This is a computer generated invoice and does not requires signature/stamp
             </div>
+            <div class="footer">
+                All rights reserved.www.adacreenhub.com
+             </div>
+
+            
         </div>
     </body>
     </html>
     `;
 };
 
-orderData= {
+orderData = {
   id: 196,
-  user_id: '7de8010b-26ac-4cca-8705-e37ef03425c8',
+  user_id: "7de8010b-26ac-4cca-8705-e37ef03425c8",
   location_id: 20,
   plan_id: 1,
-  start_date: '2027-12-27',
-  end_date: '2027-12-27',
+  start_date: "2027-12-27",
+  end_date: "2027-12-27",
   total_cost: 4999,
-  status: 'Pending Approval',
-  razorpay_order_id: 'order_RTKs1Nuz79Ii8h',
-  razorpay_payment_id: 'pay_RQ7HiCS8YcOuvT',
-  razorpay_signature: 'this_is_still_a_fake_signature_for_testing',
-  created_at: '2025-10-14T11:25:00.75262+00:00',
-  updated_at: '2025-10-14T11:25:00.75262+00:00',
-  delivery_address: '{"street":"123 API Lane","city":"Postman City","state":"Testland","zip":"12345"}',
-  gst_info: '27AAPCU1234A1Z5',
+  status: "Pending Approval",
+  razorpay_order_id: "order_RTKs1Nuz79Ii8h",
+  razorpay_payment_id: "pay_RQ7HiCS8YcOuvT",
+  razorpay_signature: "this_is_still_a_fake_signature_for_testing",
+  created_at: "2025-10-14T11:25:00.75262+00:00",
+  updated_at: "2025-10-14T11:25:00.75262+00:00",
+  delivery_address:
+    '{"street":"123 API Lane","city":"Postman City","state":"Testland","zip":"12345"}',
+  gst_info: "27AAPCU1234A1Z5",
   coupon_code: null,
   final_amount: 5898.82,
-  order_uid: '85460',
-  creative_image_url: 'https://ecyfovxtjczaugmsszih.supabase.co/storage/v1/object/public/ad-creatives/7de8010b-26ac-4cca-8705-e37ef03425c8/GphlZZVHyrUEhI5EXboFD.png',
+  order_uid: "85460",
+  creative_image_url:
+    "https://ecyfovxtjczaugmsszih.supabase.co/storage/v1/object/public/ad-creatives/7de8010b-26ac-4cca-8705-e37ef03425c8/GphlZZVHyrUEhI5EXboFD.png",
   ad_display_url: null,
   remarks: null,
-  profiles: { email: 'ysamson07@gmail.com', full_name: 'Sam', phone_number: '9876543210' },
-  locations: { name: 'Koramangala' },
-  plans: { name: 'Spark' }
-}
-
-
+  profiles: {
+    email: "ysamson07@gmail.com",
+    full_name: "Sam",
+    phone_number: "9876543210",
+  },
+  locations: { name: "Koramangala" },
+  plans: { name: "Spark" },
+};
 
 const generateInvoicePDF = async (orderData) => {
   const browser = await puppeteer.launch({
-        executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    headless: 'new' 
-    });
-    
-    const page = await browser.newPage();
-    const htmlContent = getInvoiceHtml(orderData);
-    
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
-    
-    await browser.close();
-    return pdfBuffer;
+    executablePath:
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    headless: "new",
+  });
+
+  const page = await browser.newPage();
+  const htmlContent = getInvoiceHtml(orderData);
+
+  await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+  const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
+
+  await browser.close();
+  return pdfBuffer;
 };
-
-
 
 module.exports = { generateInvoicePDF };

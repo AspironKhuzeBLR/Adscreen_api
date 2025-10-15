@@ -24,7 +24,7 @@ const runDailyLifecycleUpdate = async () => {
             .from("orders")
             .update({ status: "Completed" })
             .eq("status", "In Display")
-            .lt("end_date", now);
+            .filter("end_date", "lt", "now()"); 
 
         if (completedError) console.error("[Scheduler - Midnight] Error updating 'Completed' orders:", completedError.message);
         else console.log(`[Scheduler - Midnight] Successfully updated ${completedCount || 0} orders to 'Completed'.`);
@@ -38,30 +38,42 @@ const runDailyLifecycleUpdate = async () => {
 const runForfeitureCheck = async () => {
     console.log(`[Scheduler - Noon] Running forfeiture check job at ${new Date().toISOString()}`);
     try {
-        const forfeitCutoff = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+        // 1. Define the cutoff point. The simplest way is to find the start of
+        // the day AFTER tomorrow in UTC. This will safely include all of today and all of tomorrow.
+        const dayAfterTomorrow = new Date();
+        dayAfterTomorrow.setUTCDate(dayAfterTomorrow.getUTCDate() + 2);
+        dayAfterTomorrow.setUTCHours(0, 0, 0, 0); // Start of the day
 
+        const forfeitCutoff = dayAfterTomorrow.toISOString();
+        console.log(`[Scheduler] Cancelling 'Design Revise' orders with a start_date before ${forfeitCutoff}`);
+
+        // 2. Find orders that are in 'Design Revise' AND their start date has passed
+        // the noon deadline (i.e., their start_date is today or tomorrow).
         const { count: forfeitedCount, error: forfeitedError } = await supabase
             .from("orders")
             .update({ status: "Cancelled - Forfeited" })
             .eq("status", "Design Revise")
-            .lt("start_date", forfeitCutoff);
+            .lt("start_date", forfeitCutoff); // Finds anything less than the day after tomorrow.
 
-        if (forfeitedError) console.error("[Scheduler - Noon] Error updating 'Forfeited' orders:", forfeitedError.message);
-        else console.log(`[Scheduler - Noon] Successfully updated ${forfeitedCount || 0} orders to 'Cancelled - Forfeited'.`);
+        if (forfeitedError) {
+            console.error("[Scheduler] Error updating 'Forfeited' orders:", forfeitedError.message);
+        } else {
+            console.log(`[Scheduler] Successfully updated ${forfeitedCount || 0} orders to 'Cancelled - Forfeited'.`);
+        }
 
     } catch (err) {
-        console.error("[Scheduler - Noon] A critical error occurred during the forfeiture check job:", err.message);
+        console.error("[Scheduler] A critical error occurred during the forfeiture check job:", err.message);
     }
 };
 
 
 const initializeScheduler = () => {
-    cron.schedule('30 15 * * *', runDailyLifecycleUpdate, {
+    cron.schedule('0 0 * * *', runDailyLifecycleUpdate, {
         scheduled: true,
         timezone: "Asia/Kolkata"
     });
 
-    cron.schedule('0 12 * * *', runForfeitureCheck, {
+    cron.schedule('05 12 * * *', runForfeitureCheck, {
         scheduled: true,
         timezone: "Asia/Kolkata"
     });

@@ -10,7 +10,7 @@ const runDailyLifecycleUpdate = async () => {
         const { count: inDisplayCount, error: inDisplayError } = await supabase
             .from("orders")
             .update({ status: "In Display" })
-            .eq("status", "Pending Display Approval")
+            .eq("status", "Pending Display (Approved)")
             .filter("start_date", "lte", "now()"); 
     
 

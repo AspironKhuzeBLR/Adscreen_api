@@ -10,7 +10,6 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
   const { status, remarks, adDisplayUrl, adDisplayPath } = req.body;
 
-  // --- Initial validation (no changes here) ---
   if (!orderId) {
     throw new ApiError(400, "Order ID is required.");
   }
@@ -25,8 +24,8 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
     "Pending Display (Approved)",
     "In Display",
     "Completed",
-    "Cancelled-Forfeited",
-    "Cancelled-Refunded",
+    "Cancelled - Forfeited",
+    "Cancelled - Refunded",
   ];
   if (status && !validStatuses.includes(status)) {
     throw new ApiError(
@@ -35,7 +34,6 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
     );
   }
 
-  // --- Fetch current order (no changes here) ---
   const { data: currentOrder, error: fetchError } = await supabase
     .from("orders")
     .select(`*, profiles (full_name, email), locations (name), plans (name)`)
@@ -45,14 +43,9 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
   if (fetchError || !currentOrder) {
     throw new ApiError(404, `Order with ID ${orderId} not found.`);
   }
-
-  // --- NEW, SIMPLIFIED LOGIC BELOW ---
-
   const oldStatus = currentOrder.status;
 
-  // Only validate if a status change is being requested.
   if (status && status !== oldStatus) {
-    // 1. Define the list of statuses an admin is explicitly allowed to set manually.
     const allowedManualStatuses = [
       "Pending Payment",
       "Payment Failed",
@@ -61,11 +54,10 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
       "Pending Display (Approved)",
       "In Display",
       "Completed",
-      "Cancelled-Forfeited",
-      "Cancelled-Refunded",
+      "Cancelled - Forfeited",
+      "Cancelled - Refunded",
     ];
 
-    // 2. If the requested status is NOT in this list, block the change.
     if (!allowedManualStatuses.includes(status)) {
       throw new ApiError(
         400,
@@ -74,12 +66,8 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
         )}.`
       );
     }
-    // If the status is in the allowed list, the code will simply proceed with the update.
   }
 
-  // --- END OF NEW LOGIC ---
-
-  // --- Construct payload and perform update (no changes here) ---
   const updateData = {};
   if (status) updateData.status = status;
   if (remarks) updateData.remarks = remarks;

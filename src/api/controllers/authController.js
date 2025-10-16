@@ -858,9 +858,9 @@ const deleteAccount = asyncHandler(async (req, res) => {
       signInError
     );
   }
-
-  const anonymizedEmail = `deleted_${profile.email}`;
-  const anonymizedName=  `deleted_${profile.full_name}`;
+  const timestamp = Date.now();
+  const anonymizedEmail = `deleted_${profile.email}_${timestamp}`;
+  const anonymizedName=  `deleted_${profile.full_name}_${timestamp}`;
 
   const { error: anonymizeError } = await supabase
     .from("profiles")

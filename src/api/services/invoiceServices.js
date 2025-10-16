@@ -1,10 +1,9 @@
-const puppeteer = require("puppeteer-core"); // <-- Change this line
+const chromium = require("@sparticuz/chromium");
+const puppeteer = require("puppeteer-core");
 
 const getInvoiceHtml = (orderData) => {
-  // Parse the delivery address from the JSON string
   const deliveryAddress = JSON.parse(orderData.delivery_address);
 
-  // Calculate amounts
   const taxableAmount = orderData.final_amount / 1.18;
   const gstAmount = orderData.final_amount - taxableAmount;
 
@@ -198,9 +197,9 @@ const getInvoiceHtml = (orderData) => {
             <div class="footer">
                 This is a computer generated invoice and does not requires signature/stamp
             </div>
-            <div class="footer">
+            <p>
                 All rights reserved.www.adacreenhub.com
-             </div>
+            </p>
 
             
         </div>
@@ -209,55 +208,45 @@ const getInvoiceHtml = (orderData) => {
     `;
 };
 
-orderData = {
-  id: 196,
-  user_id: "7de8010b-26ac-4cca-8705-e37ef03425c8",
-  location_id: 20,
-  plan_id: 1,
-  start_date: "2027-12-27",
-  end_date: "2027-12-27",
-  total_cost: 4999,
-  status: "Pending Approval",
-  razorpay_order_id: "order_RTKs1Nuz79Ii8h",
-  razorpay_payment_id: "pay_RQ7HiCS8YcOuvT",
-  razorpay_signature: "this_is_still_a_fake_signature_for_testing",
-  created_at: "2025-10-14T11:25:00.75262+00:00",
-  updated_at: "2025-10-14T11:25:00.75262+00:00",
-  delivery_address:
-    '{"street":"123 API Lane","city":"Postman City","state":"Testland","zip":"12345"}',
-  gst_info: "27AAPCU1234A1Z5",
-  coupon_code: null,
-  final_amount: 5898.82,
-  order_uid: "85460",
-  creative_image_url:
-    "https://ecyfovxtjczaugmsszih.supabase.co/storage/v1/object/public/ad-creatives/7de8010b-26ac-4cca-8705-e37ef03425c8/GphlZZVHyrUEhI5EXboFD.png",
-  ad_display_url: null,
-  remarks: null,
-  profiles: {
-    email: "ysamson07@gmail.com",
-    full_name: "Sam",
-    phone_number: "9876543210",
-  },
-  locations: { name: "Koramangala" },
-  plans: { name: "Spark" },
-};
 
-const generateInvoicePDF = async (orderData) => {
-  const browser = await puppeteer.launch({
-    executablePath:
-      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    headless: "new",
+async function getBrowser() {
+  // If in a development environment, use the local Chrome install
+  if (process.env.NODE_ENV === 'development') {
+    console.log("Using local Chrome for development...");
+    return await puppeteer.launch({
+      executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      headless: false // You can see the browser in action
+    });
+  }
+
+  // For production/cloud, use the serverless-compatible chromium
+  console.log("Using @sparticuz/chromium for production...");
+  return await puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
   });
+}
+const generateInvoicePDF = async (orderData) => {
+  let browser = null;
+  try {
+    browser = await getBrowser();
+    const page = await browser.newPage();
+    const htmlContent = getInvoiceHtml(orderData); // Your existing HTML generation logic
 
-  const page = await browser.newPage();
-  const htmlContent = getInvoiceHtml(orderData);
+    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+    const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
 
-  await page.setContent(htmlContent, { waitUntil: "networkidle0" });
-  const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
-
-  await browser.close();
-  return pdfBuffer;
+    return pdfBuffer;
+  } catch (error) {
+    console.error("Error generating PDF with Puppeteer:", error);
+    throw new Error("Could not generate the invoice PDF.");
+  } finally {
+    if (browser !== null) {
+      await browser.close();
+    }
+  }
 };
 
 module.exports = { generateInvoicePDF };

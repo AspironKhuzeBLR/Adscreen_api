@@ -32,6 +32,7 @@ const generateInvoicePdfBuffer = (orderData) => {
         
         doc.font('Helvetica-Bold').fontSize(20).text('ADSCREENHUB MEDIA', 170, 50);
         doc.font('Helvetica').fontSize(10).text('Koramangala, Bengaluru - 560095', 172, 75);
+        doc.font('Helvetica').fontSize(10).text('GSTIN: 29ACKFA5754B1ZD', 172, 90);
 
         doc.font('Helvetica-Bold').fontSize(16).text('TAX INVOICE', 400, 50, { align: 'right' });
         doc.font('Helvetica').fontSize(10).text(`Invoice #: ${orderData.order_uid}`, 400, 72, { align: 'right' });

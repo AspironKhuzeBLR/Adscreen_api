@@ -154,7 +154,6 @@ const sendOrderConfirmationEmail = async (orderDetails, recipientEmail, customer
 
     console.log(`Sending order confirmation for order ID ${orderDetails.id} to ${recipientEmail}`);
     
-    // Pass attachments to the base sender function
     return sendEmail(ORDER_CONFIRM_TPL_ID, recipientEmail, variables);
 };
 

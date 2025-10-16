@@ -79,9 +79,6 @@ const getLocationsWithAvailability = asyncHandler(async (req, res) => {
     );
 });
 
-// In src/api/controllers/data.controller.js
-// Renamed from checkPlanAvailability
-
 const getAvailabilityAndPrice = asyncHandler(async (req, res) => {
     const { locationId } = req.params;
     const { startDate, planId } = req.query;
@@ -90,7 +87,6 @@ const getAvailabilityAndPrice = asyncHandler(async (req, res) => {
         throw new ApiError(400, "locationId, startDate, and planId are required query parameters.");
     }
 
-    // Step 1: Fetch the plan's duration and its specific price for this location in one go.
     const { data: planDetails, error: planDetailsError } = await supabase
         .from('location_plan_pricing')
         .select(`
@@ -106,7 +102,6 @@ const getAvailabilityAndPrice = asyncHandler(async (req, res) => {
         throw new ApiError(404, "A valid price could not be found for the selected plan and location.");
     }
 
-    // Step 2: Check the availability for the entire date range using the fetched duration.
     const { data: isAvailable, error: rpcError } = await supabase.rpc(
         'check_availability_for_range',
         {
@@ -121,8 +116,6 @@ const getAvailabilityAndPrice = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Error checking availability.");
     }
 
-    // Step 3: Return the result.
-    // If available, include the price and duration. If not, just indicate it's not available.
     if (isAvailable) {
         res.status(200).json(new ApiResponse(200, {
             isAvailable: true,

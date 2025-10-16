@@ -270,7 +270,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
   const otp = msg91Service.generateOtp();
   const hashedOtp = await bcrypt.hash(otp, 10);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10-minute expiry as per template
-
+  console.log(otp)
   await supabase.from("verifications").insert({
     identifier: lowercasedEmail,
     validator_hash: hashedOtp, // Storing hashed OTP here
@@ -449,6 +449,7 @@ const login = asyncHandler(async (req, res) => {
     email,
     password,
   });
+  console.log(data, error);
   if (error) throw new ApiError(401, "Invalid email or password.", error);
 
   const { data: profile } = await supabase
@@ -829,6 +830,7 @@ const completePhoneUpdate = asyncHandler(async (req, res) => {
 const deleteAccount = asyncHandler(async (req, res) => {
   const { password } = req.body;
   const userId = req.user.id;
+  console.log(password)
 
   if (!password) {
     throw new ApiError(400, "Password is required to confirm account deletion.");
@@ -836,7 +838,7 @@ const deleteAccount = asyncHandler(async (req, res) => {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("email")
+    .select("email,full_name")
     .eq("id", userId)
     .single();
 
@@ -844,7 +846,6 @@ const deleteAccount = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User profile not found.");
   }
 
-  // 2. --- VERIFY PASSWORD ---
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email: profile.email,
     password: password,
@@ -858,19 +859,16 @@ const deleteAccount = asyncHandler(async (req, res) => {
     );
   }
 
-  // 3. --- ANONYMIZE PROFILE DATA (The "Soft" part for DB integrity) ---
-  // We must change the email in profiles to free it up if there's a unique constraint,
-  // and to ensure PII is removed.
-  const timestamp = Date.now();
-  const anonymizedEmail = `deleted_${userId.slice(0, 8)}_${timestamp}@inactive.local`;
+  const anonymizedEmail = `deleted_${profile.email}`;
+  const anonymizedName=  `deleted_${profile.full_name}`;
 
   const { error: anonymizeError } = await supabase
     .from("profiles")
     .update({
       email: anonymizedEmail,
-      phone_number: null, // Assuming column allows NULL. If not, use a unique dummy format like `0000000000_${timestamp}`
-      full_name: "Deleted User",
-      gst_info: null, // Scrub other PII
+      phone_number: null,
+      full_name: anonymizedName,
+      gst_info: null, 
       deleted_at: new Date().toISOString(),
     })
     .eq("id", userId);
@@ -884,37 +882,35 @@ const deleteAccount = asyncHandler(async (req, res) => {
     );
   }
 
-  // 4. --- HARD DELETE FROM SUPABASE AUTH ---
-  // This frees up the original email and phone for re-registration.
-  // Use admin API to bypass RLS and ensure deletion.
-  const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(userId);
+  const { error: disableAuthError } = await supabase.auth.admin.updateUserById(
+    userId,
+    {
+      email: anonymizedEmail, 
+      password: crypto.randomBytes(32).toString('hex'),
+      user_metadata: { deactivated: true, original_email: profile.email }, 
+    
+    }
+  );
 
-  if (deleteAuthError) {
-    // CRITICAL SCENARIO: Profile is anonymized, but Auth user still exists.
-    // User won't be able to login (email changed in profile, need to check logic),
-    // but also can't re-register.
+  if (disableAuthError) {
+    
     console.error(
-      `CRITICAL: Profile anonymized for ${userId}, but Auth deletion failed. Manual intervention required.`,
-      deleteAuthError
+      `CRITICAL: Profile anonymized for ${userId}, but Auth disable failed. Manual intervention required.`,
+      disableAuthError
     );
     
-    // Ideally, rollback step 3 here, but supabase-js doesn't support multi-step transactions easily without RPC.
-    // For now, throw error instructing user to contact support.
     throw new ApiError(
       500,
       "An error occurred during final deletion. Please contact support.",
-      deleteAuthError
+      disableAuthError
     );
   }
 
-  // 5. --- CLEANUP VERIFICATIONS (Optional but recommended) ---
-  // Delete pending OTPs/links associated with the anonymized profile to keep DB clean.
-  await supabase
-      .from("verifications")
-      .delete()
-      .eq("user_id", userId); // Assuming verifications has user_id, or use the old email before anonymizing.
+  await supabase.from("verifications").delete().eq("user_id", userId);
 
-  // 6. --- RESPOND WITH SUCCESS ---
+  await supabase.auth.signOut();
+
+
   res
     .status(200)
     .json(new ApiResponse(200, null, "Your account has been permanently deleted. You may register again as a new user."));

@@ -59,7 +59,6 @@ const initiateOrder = asyncHandler(async (req, res) => {
     const calculatedEndDate = new Date(startDate);
     calculatedEndDate.setDate(calculatedEndDate.getDate() + durationDays - 1);
     const endDateString = calculatedEndDate.toISOString().split('T')[0];
-    // 1. Atomically get the next sequential UID from the database
     const { data: orderUID, error: uidError } = await supabase.rpc('get_next_order_uid');
 
     if (uidError || !orderUID) {
@@ -233,43 +232,36 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
         return; 
     }
   try {
-        // 1. Generate the PDF Buffer (This part is correct and stays)
         console.log(`Generating invoice for order ${orderId}...`);
         const pdfBuffer = await generateInvoicePDF(fullOrderDetails);
 
-        // --- NEW LOGIC: UPLOAD INSTEAD OF ATTACHING ---
 
-        // 2. Define a unique file path for the invoice in Supabase Storage
         const invoiceFileName = `${fullOrderDetails.order_uid}.pdf`;
         const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('invoice') // Assumes you have a bucket named 'invoices'
+            .from('invoice') 
             .upload(invoiceFileName, pdfBuffer, {
                 contentType: 'application/pdf',
-                upsert: false // Don't overwrite if a file with the same name exists
+                upsert: false 
             });
 
         if (uploadError) {
-            // If upload fails, we should still try to send the email without the link
             console.error(`Failed to upload invoice for order ${orderId}:`, uploadError);
             throw new ApiError(500, "Failed to store invoice file.");
         }
 
-        // 3. Get the public URL of the uploaded invoice
         const { data: urlData } = supabase.storage
             .from('invoice')
             .getPublicUrl(invoiceFileName);
         
         const invoiceUrl = urlData.publicUrl;
         
-        // --- END OF NEW LOGIC ---
-
-        // 4. Send the confirmation email with the INVOICE_URL variable
+      
         const {error:emailError}=await msg91Service.sendOrderConfirmationEmail(
-            { // Pass down all required data
+            { 
                 ...fullOrderDetails,
                 location_name: fullOrderDetails.locations.name,
                 plan_name: fullOrderDetails.plans.name,
-                invoiceUrl: invoiceUrl, // Pass the URL as a special variable
+                invoiceUrl: invoiceUrl, 
 
             },
             fullOrderDetails.profiles.email,

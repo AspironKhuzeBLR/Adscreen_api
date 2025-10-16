@@ -235,7 +235,6 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
   try {
         // 1. Generate the PDF Buffer (This part is correct and stays)
         console.log(`Generating invoice for order ${orderId}...`);
-        console.log("Order Details:", fullOrderDetails);
         const pdfBuffer = await generateInvoicePDF(fullOrderDetails);
 
         // --- NEW LOGIC: UPLOAD INSTEAD OF ATTACHING ---
@@ -265,7 +264,7 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
         // --- END OF NEW LOGIC ---
 
         // 4. Send the confirmation email with the INVOICE_URL variable
-        await msg91Service.sendOrderConfirmationEmail(
+        const {error:emailError}=await msg91Service.sendOrderConfirmationEmail(
             { // Pass down all required data
                 ...fullOrderDetails,
                 location_name: fullOrderDetails.locations.name,
@@ -276,6 +275,9 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
             fullOrderDetails.profiles.email,
             fullOrderDetails.profiles.full_name,
         );
+        if (emailError){
+
+        }
 
         console.log(`Successfully sent order confirmation with invoice link for order ${orderId}.`);
 

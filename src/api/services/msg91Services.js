@@ -138,6 +138,8 @@ const sendOrderConfirmationEmail = async (orderDetails, recipientEmail, customer
     const ORDER_CONFIRM_TPL_ID = process.env.MSG91_ORDER_CONFIRMATION_TPL_ID;
     const orderLink = `${process.env.FRONTEND_URL}/my-orders`; 
 
+    console.log("Order Details for Email:", orderDetails);
+
     const variables = {
         CUSTOMER_NAME: customerName,
         ORDER_ID: orderDetails.order_uid || orderDetails.id, 

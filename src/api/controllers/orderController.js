@@ -5,7 +5,7 @@ const asyncHandler = require("../../utils/asyncHandler");
 const ApiError = require("../../utils/ApiError");
 const ApiResponse = require("../../utils/ApiResponse");
 const msg91Service = require("../services/msg91Services");
-const {generateInvoicePDF} = require("../services/invoiceServices"); // Import the invoice generation service
+const {generateInvoicePdfBuffer} = require("../services/invoiceServices"); // Import the invoice generation service
 
 
 const razorpay = new Razorpay({
@@ -220,7 +220,7 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
         .from('orders')
         .select(`
             *,
-            profiles ( full_name, email , phone_number),
+            profiles ( full_name, email, phone_number),
             locations ( name ),
             plans ( name )
         `)
@@ -228,50 +228,34 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
         .single();
 
     if (detailsError || !fullOrderDetails) {
-        console.error(`CRITICAL: Failed to fetch details for order ${orderId} after successful payment. Email and invoice not sent.`, detailsError);
+        console.error(`CRITICAL: Failed to fetch details for order ${orderId} after payment.`, detailsError);
         return; 
     }
-  try {
-        console.log(`Generating invoice for order ${orderId}...`);
-        const pdfBuffer = await generateInvoicePDF(fullOrderDetails);
 
+    try {
+        // 1. Generate the PDF invoice as a buffer in memory
+        console.log(`Generating invoice PDF for order ${orderId}...`);
+        const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
 
-        const invoiceFileName = `${fullOrderDetails.order_uid}.pdf`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('invoice') 
-            .upload(invoiceFileName, pdfBuffer, {
-                contentType: 'application/pdf',
-                upsert: false 
-            });
+        // 2. Prepare the attachment object for the email service
+        const attachment = {
+            filename: `invoice-${fullOrderDetails.order_uid}.pdf`,
+            content: pdfBuffer.toString('base64'), // Convert buffer to Base64 string
+        };
 
-        if (uploadError) {
-            console.error(`Failed to upload invoice for order ${orderId}:`, uploadError);
-            throw new ApiError(500, "Failed to store invoice file.");
-        }
-
-        const { data: urlData } = supabase.storage
-            .from('invoice')
-            .getPublicUrl(invoiceFileName);
-        
-        const invoiceUrl = urlData.publicUrl;
-        
-      
-        const {error:emailError}=await msg91Service.sendOrderConfirmationEmail(
-            { 
+        // 3. Send the confirmation email with the PDF attached
+        await msg91Service.sendOrderConfirmationEmail(
+            { // orderDetails
                 ...fullOrderDetails,
                 location_name: fullOrderDetails.locations.name,
                 plan_name: fullOrderDetails.plans.name,
-                invoiceUrl: invoiceUrl, 
-
             },
-            fullOrderDetails.profiles.email,
-            fullOrderDetails.profiles.full_name,
+            fullOrderDetails.profiles.email,      // recipientEmail
+            fullOrderDetails.profiles.full_name,  // customerName
+            attachment                            // ** THE NEW ATTACHMENT ARGUMENT **
         );
-        if (emailError){
 
-        }
-
-        console.log(`Successfully sent order confirmation with invoice link for order ${orderId}.`);
+        console.log(`Successfully sent order confirmation with PDF attachment for order ${orderId}.`);
 
     } catch (processError) {
         console.error(`Post-payment processing failed for order ${orderId}:`, processError);

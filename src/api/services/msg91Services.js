@@ -91,22 +91,27 @@ const verifySmsOtp = async (phoneNumber, otp) => {
     }
 };
 
-
-const sendEmail = async (templateId, recipientEmail, variables) => {
+const sendEmail = async (templateId, recipientEmail, variables, attachment = null) => {
     const url = 'https://api.msg91.com/api/v5/email/send';
     const payload = {
         template_id: templateId,
         recipients: [{ to: [{ email: recipientEmail }], variables }],
         from: { name: FROM_NAME, email: FROM_EMAIL },
-
     };
+
+    
+    if (attachment && attachment.content && attachment.filename) {
+        payload.attachments = [{
+            file: `data:application/pdf;base64,${attachment.content}`, // Data URI format
+            fileName: attachment.filename
+        }];
+    }
 
     const headers = { 'authkey': AUTH_KEY, 'Content-Type': 'application/json' };
 
     try {
-        console.log("Payload:", payload);
         await axios.post(url, payload, { headers });
-        return true;
+        return { success: true };
     } catch (error) {
         console.error('MSG91 sendEmail Error:', error.response ? error.response.data : error.message);
         throw new ApiError(500, 'There was an issue sending the email.');
@@ -134,11 +139,9 @@ const sendPasswordResetLink = async (email, customerName, resetLink) => {
     const variables = { CUSTOMER_NAME: customerName, RESET_LINK: resetLink };
     return sendEmail(LINK_BASED_RESET_TPL_ID, email, variables);
 };
-const sendOrderConfirmationEmail = async (orderDetails, recipientEmail, customerName) => {
+const sendOrderConfirmationEmail = async (orderDetails, recipientEmail, customerName, attachment) => {
     const ORDER_CONFIRM_TPL_ID = process.env.MSG91_ORDER_CONFIRMATION_TPL_ID;
     const orderLink = `${process.env.FRONTEND_URL}/my-orders`; 
-
-    console.log("Order Details for Email:", orderDetails);
 
     const variables = {
         CUSTOMER_NAME: customerName,
@@ -148,13 +151,11 @@ const sendOrderConfirmationEmail = async (orderDetails, recipientEmail, customer
         plan_name: orderDetails.plan_name,
         gross_amount: orderDetails.final_amount || orderDetails.total_cost, 
         ORDER_LINK: orderLink,
-        invoiceUrl: orderDetails.invoiceUrl,
-
     };
 
     console.log(`Sending order confirmation for order ID ${orderDetails.id} to ${recipientEmail}`);
     
-    return sendEmail(ORDER_CONFIRM_TPL_ID, recipientEmail, variables);
+    return sendEmail(ORDER_CONFIRM_TPL_ID, recipientEmail, variables, attachment);
 };
 
 const sendContactUserConfirmationEmail = async (recipientEmail, formData) => {

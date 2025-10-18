@@ -64,10 +64,10 @@ const runForfeitureCheck = async () => {
 
 
 const initializeScheduler = () => {
-    cron.schedule('40 21 * * *', runDailyLifecycleUpdate, {
+    cron.schedule('00 00 * * *', runDailyLifecycleUpdate, {
         scheduled: true,
         timezone: "Asia/Kolkata"
-    });
+    }); 
 
     cron.schedule('05 12 * * *', runForfeitureCheck, {
         scheduled: true,

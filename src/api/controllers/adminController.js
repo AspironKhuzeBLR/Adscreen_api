@@ -100,7 +100,6 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Failed to update the order.", updateError);
   }
 
-  // --- Trigger email (no changes here) ---
   if (status && status !== oldStatus) {
     console.log(
       `Order ${orderId} status changed from '${oldStatus}' to '${status}'. Triggering email.`

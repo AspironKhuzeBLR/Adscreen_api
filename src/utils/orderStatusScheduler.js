@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const supabase = require('../config/supabase'); // Adjust the path to your supabase client config
+const supabase = require('../config/supabase'); 
 
 const runDailyLifecycleUpdate = async () => {
     console.log(`[Scheduler - Midnight] Running daily lifecycle job at ${new Date().toISOString()}`);
@@ -9,7 +9,7 @@ const runDailyLifecycleUpdate = async () => {
 
         const { count: inDisplayCount, error: inDisplayError } = await supabase
             .from("orders")
-            .update({ status: "In Display" })
+            .update({ status: "In Display" }, { count: 'exact' }) // <-- FIX: Added options object
             .eq("status", "Pending Display (Approved)")
             .filter("start_date", "lte", "now()"); 
     
@@ -22,7 +22,7 @@ const runDailyLifecycleUpdate = async () => {
 
         const { count: completedCount, error: completedError } = await supabase
             .from("orders")
-            .update({ status: "Completed" })
+            .update({ status: "Completed" }, { count: 'exact' }) // <-- FIX: Added options object
             .eq("status", "In Display")
             .filter("end_date", "lt", "now()"); 
 
@@ -38,20 +38,16 @@ const runDailyLifecycleUpdate = async () => {
 const runForfeitureCheck = async () => {
     console.log(`[Scheduler - Noon] Running forfeiture check job at ${new Date().toISOString()}`);
     try {
-        // 1. Define the cutoff point. The simplest way is to find the start of
-        // the day AFTER tomorrow in UTC. This will safely include all of today and all of tomorrow.
-        const dayAfterTomorrow = new Date();
+         const dayAfterTomorrow = new Date();
         dayAfterTomorrow.setUTCDate(dayAfterTomorrow.getUTCDate() + 2);
         dayAfterTomorrow.setUTCHours(0, 0, 0, 0); // Start of the day
 
         const forfeitCutoff = dayAfterTomorrow.toISOString();
         console.log(`[Scheduler] Cancelling 'Design Revise' orders with a start_date before ${forfeitCutoff}`);
 
-        // 2. Find orders that are in 'Design Revise' AND their start date has passed
-        // the noon deadline (i.e., their start_date is today or tomorrow).
-        const { count: forfeitedCount, error: forfeitedError } = await supabase
+          const { count: forfeitedCount, error: forfeitedError } = await supabase
             .from("orders")
-            .update({ status: "Cancelled - Forfeited" })
+            .update({ status: "Cancelled - Forfeited" }, { count: 'exact' }) // <-- FIX: Added options object
             .eq("status", "Design Revise")
             .lt("start_date", forfeitCutoff); // Finds anything less than the day after tomorrow.
 
@@ -68,7 +64,7 @@ const runForfeitureCheck = async () => {
 
 
 const initializeScheduler = () => {
-    cron.schedule('0 0 * * *', runDailyLifecycleUpdate, {
+    cron.schedule('40 21 * * *', runDailyLifecycleUpdate, {
         scheduled: true,
         timezone: "Asia/Kolkata"
     });

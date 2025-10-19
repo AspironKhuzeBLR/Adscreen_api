@@ -1,4 +1,4 @@
-    const axios = require('axios');
+const axios = require('axios');
 const ApiError = require('../../utils/ApiError');
 const AUTH_KEY = process.env.MSG91_AUTH_KEY;
 const PHONE_TPL_ID = process.env.MSG91_PHONE_VERIFICATION_TPL_ID;
@@ -46,7 +46,6 @@ const sendSmsWithOtp = async (phoneNumber, otp) => {
 };
 const sendSmsWithOtp_PhoneUpdate = async (phoneNumber, otp) => {
     const url = 'https://control.msg91.com/api/v5/flow';
-    console.log(MSG91_PHONE_UPDATE_TPL_ID,phoneNumber,otp);
     const payload = {
         template_id: MSG91_PHONE_UPDATE_TPL_ID,
         recipients: [
@@ -124,7 +123,6 @@ const sendEmailVerificationLink = async (email, customerName, verificationLink) 
 };
 
 
-// NEW: Function to send a password reset OTP, as per your request
 const sendPasswordResetOtp = async (email, customerName, otp) => {
     const variables = { CUSTOMER_NAME: customerName, OTP: otp };
     return sendEmail(PASSWORD_RESET_TPL_ID, email, variables);
@@ -153,7 +151,6 @@ const sendOrderConfirmationEmail = async (orderDetails, recipientEmail, customer
         ORDER_LINK: orderLink,
     };
 
-    console.log(`Sending order confirmation for order ID ${orderDetails.id} to ${recipientEmail}`);
     
     return sendEmail(ORDER_CONFIRM_TPL_ID, recipientEmail, variables, attachment);
 };
@@ -168,7 +165,6 @@ const sendContactUserConfirmationEmail = async (recipientEmail, formData) => {
         user_message: formData.message,
     };
 
-    console.log(`Sending contact form confirmation to user: ${recipientEmail}`);
     return sendEmail(CONTACT_USER_CONFIRM_TPL_ID, recipientEmail, variables);
 };
 
@@ -189,7 +185,6 @@ const sendContactAdminNotificationEmail = async (formData) => {
         user_message: formData.message,
     };
 
-    console.log(`Sending new contact form notification to admin: ${ADMIN_EMAIL}`);
     return sendEmail(CONTACT_ADMIN_NOTIFY_TPL_ID, ADMIN_EMAIL, variables);
 };
 
@@ -211,7 +206,6 @@ const sendOrderStatusUpdateEmail = async (orderDetails) => {
         NEW_STATUS: orderDetails.status 
     };
 
-    console.log(`Sending order status update for order ID ${orderDetails.id} to ${recipientEmail}`);
     return sendEmail(ORDER_STATUS_UPDATE_TPL_ID, recipientEmail, variables);
 };
 module.exports = {

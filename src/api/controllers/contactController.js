@@ -23,22 +23,16 @@ const submitContactForm = asyncHandler(async (req, res) => {
 
     try {
         await sendContactUserConfirmationEmail(email, formData);
-        console.log(`Contact confirmation email sent to ${email}`);
     } catch (emailError) {
         console.error(`Failed to send user contact confirmation email to ${email}:`, emailError);
-        // Do NOT throw here, as the user successfully submitted the form.
-        // We'll still send them a success response for the API call.
-    }
+           }
 
     try {
         await sendContactAdminNotificationEmail(formData);
-        console.log('Admin notification email sent.');
     } catch (emailError) {
         console.error('Failed to send admin contact notification email:', emailError);
-        // Do NOT throw here. Admin notification is secondary to user experience.
     }
 
-    // 3. Respond to the user
     res.status(200).json(
         new ApiResponse(
             200,

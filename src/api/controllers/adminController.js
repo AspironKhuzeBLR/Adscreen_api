@@ -101,9 +101,7 @@ const updateOrderDetails = asyncHandler(async (req, res) => {
   }
 
   if (status && status !== oldStatus) {
-    console.log(
-      `Order ${orderId} status changed from '${oldStatus}' to '${status}'. Triggering email.`
-    );
+  
     try {
       const emailPayload = { ...currentOrder, status: updatedOrder.status };
       await msg91Service.sendOrderStatusUpdateEmail(emailPayload);

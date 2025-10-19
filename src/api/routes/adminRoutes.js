@@ -1,4 +1,3 @@
-// src/api/routes/adminRoutes.js
 const express = require("express");
 const { protect, checkAdminRole } = require("../middleware/authMiddleware");
 

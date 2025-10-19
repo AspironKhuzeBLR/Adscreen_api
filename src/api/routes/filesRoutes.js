@@ -1,4 +1,3 @@
-// src/api/routes/file.routes.js
 const { Router } = require('express');
 const { createSignedUploadUrl,finalizeCreativeUpload,createReuploadUrl,finalizeReupload } = require('../controllers/filesController');
 const { protect } = require('../middleware/authMiddleware');

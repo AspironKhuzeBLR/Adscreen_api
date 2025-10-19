@@ -6,8 +6,7 @@ const { getPlans,
 const { protect } = require('../middleware/authMiddleware');
 const router = Router();
 
-router.use(protect); // Protect all routes in this router
-
+router.use(protect); 
 router.get('/plans', getPlans);
 
 router.get('/plans/location/:locationId', getPlansForLocation);

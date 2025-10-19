@@ -65,7 +65,6 @@ const initiateOrder = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Could not reserve a new Order ID.", uidError);
     }
     
-    console.log(`Reserved Order UID: ${orderUID}`);
 
     const rpOrder = await razorpay.orders.create({
         amount: totalAmountInPaise,
@@ -100,7 +99,6 @@ const initiateOrder = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Could not create the initial order record.", orderError);
     }
 
-    console.log("New order created:", newOrder);
     const { error: creativeError } = await supabase.from('creatives').insert({
         order_id: newOrder.id,
         user_id: userId,
@@ -233,29 +231,24 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
     }
 
     try {
-        // 1. Generate the PDF invoice as a buffer in memory
-        console.log(`Generating invoice PDF for order ${orderId}...`);
         const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
 
-        // 2. Prepare the attachment object for the email service
         const attachment = {
             filename: `invoice-${fullOrderDetails.order_uid}.pdf`,
-            content: pdfBuffer.toString('base64'), // Convert buffer to Base64 string
+            content: pdfBuffer.toString('base64'), 
         };
 
-        // 3. Send the confirmation email with the PDF attached
         await msg91Service.sendOrderConfirmationEmail(
-            { // orderDetails
+            { 
                 ...fullOrderDetails,
                 location_name: fullOrderDetails.locations.name,
                 plan_name: fullOrderDetails.plans.name,
             },
-            fullOrderDetails.profiles.email,      // recipientEmail
-            fullOrderDetails.profiles.full_name,  // customerName
-            attachment                            // ** THE NEW ATTACHMENT ARGUMENT **
+            fullOrderDetails.profiles.email,      
+            fullOrderDetails.profiles.full_name,
+            attachment
         );
 
-        console.log(`Successfully sent order confirmation with PDF attachment for order ${orderId}.`);
 
     } catch (processError) {
         console.error(`Post-payment processing failed for order ${orderId}:`, processError);

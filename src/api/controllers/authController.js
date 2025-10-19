@@ -270,7 +270,6 @@ const forgotPassword = asyncHandler(async (req, res) => {
   const otp = msg91Service.generateOtp();
   const hashedOtp = await bcrypt.hash(otp, 10);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10-minute expiry as per template
-  console.log(otp)
   await supabase.from("verifications").insert({
     identifier: lowercasedEmail,
     validator_hash: hashedOtp, // Storing hashed OTP here
@@ -449,7 +448,6 @@ const login = asyncHandler(async (req, res) => {
     email,
     password,
   });
-  console.log(data, error);
   if (error) throw new ApiError(401, "Invalid email or password.", error);
 
   const { data: profile } = await supabase
@@ -477,7 +475,6 @@ const signOut = asyncHandler(async (req, res) => {
 
 const getMyProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  console.log(userId);
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("email, full_name, phone_number, gst_info, user_role")
@@ -724,7 +721,6 @@ const startPhoneUpdate = asyncHandler(async (req, res) => {
       "Error fetching current user profile.",
       currentProfileError
     );
-  console.log(currentUserProfile.phone_number, newPhoneNumber);
   if (
     currentUserProfile &&
     currentUserProfile.phone_number === newPhoneNumber
@@ -739,7 +735,6 @@ const startPhoneUpdate = asyncHandler(async (req, res) => {
         )
       );
   }
-  console.log(currentUserProfile);
   const otp = msg91Service.generateOtp();
   const hashedOtp = await bcrypt.hash(otp, 10);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -753,7 +748,6 @@ const startPhoneUpdate = asyncHandler(async (req, res) => {
       type: "PHONE_UPDATE",
       user_id: userId,
     });
-  console.log(otp);
   await msg91Service.sendSmsWithOtp_PhoneUpdate(
     newPhoneNumber,
     otp
@@ -830,7 +824,6 @@ const completePhoneUpdate = asyncHandler(async (req, res) => {
 const deleteAccount = asyncHandler(async (req, res) => {
   const { password } = req.body;
   const userId = req.user.id;
-  console.log(password)
 
   if (!password) {
     throw new ApiError(400, "Password is required to confirm account deletion.");

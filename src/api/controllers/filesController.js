@@ -234,7 +234,6 @@ const finalizeReupload = asyncHandler(async (req, res) => {
   
   if (oldCreative && oldCreative.file_path) {
     try {
-      console.log("Removing old creative file at path:", oldCreative.file_path);
       await supabase.storage.from(BUCKET_NAME).remove([oldCreative.file_path]);
     } catch (removeError) {
       console.error(

@@ -1,4 +1,3 @@
-// src/api/routes/order.routes.js
 const { Router } = require('express');
 const { initiateOrder, verifyPayment, getUserOrders } = require('../controllers/orderController');
 const { protect } = require('../middleware/authMiddleware');

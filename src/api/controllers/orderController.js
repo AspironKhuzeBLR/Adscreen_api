@@ -123,9 +123,11 @@ const initiateOrder = asyncHandler(async (req, res) => {
 const verifyPayment = asyncHandler(async (req, res) => {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = req.body;
 
+    console.log(razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId);
+
     const { data: order, error: fetchError } = await supabase
         .from('orders')
-        .select('status')
+        .select('status, final_amount') 
         .eq('id', orderId)
         .single();
 
@@ -140,31 +142,27 @@ const verifyPayment = asyncHandler(async (req, res) => {
         case 'Completed':
             console.warn(`Idempotent call: Verification attempted for already processed order ${orderId}.`);
             return res.status(200).json(new ApiResponse(200, { orderId, status: order.status }, "This order has already been successfully processed."));
-
         case 'Cancelled - Refunded':
         case 'Cancelled':
         case 'Failed':
             console.warn(`Verification attempted for terminal order ${orderId} with status: ${order.status}.`);
             return res.status(409).json(new ApiResponse(409, { orderId, status: order.status }, `This order cannot be processed as it has a status of "${order.status}".`));
-
         case 'Pending Payment':
             break; 
-        
         default:
             console.error(`Verification attempted for order ${orderId} with an unknown or invalid status: ${order.status}.`);
             throw new ApiError(409, `The order is in an state of (${order.status}) and booking cannot be processed.`);
     }
 
-    // --- Main Logic: This block only runs if status was 'Pending Payment' ---
-
-    // 1. Signature Verification (Uncomment for Production)
-    /*
+    // --- SIGNATURE VERIFICATION (Uncomment for Production) ---
+    
     const body = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSignature = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(body.toString()).digest('hex');
     if (expectedSignature !== razorpay_signature) {
         throw new ApiError(400, "Invalid payment signature.");
+        console.error(`Payment signature mismatch for order ${orderId}. Expected ${expectedSignature}, got ${razorpay_signature}.`);
     }
-    */
+    
 
     const { data: rpcResult, error: rpcError } = await supabase.rpc('confirm_booking_and_update_inventory', {
         p_order_id: orderId
@@ -172,30 +170,39 @@ const verifyPayment = asyncHandler(async (req, res) => {
     
     switch (rpcResult) {
         case 'SUCCESS':
-            console.log("Success from rpc",rpcResult);
-           
-            await handleSuccessfulPayment({ orderId, razorpay_payment_id, razorpay_signature });
+            try {
+                console.log(`[SUCCESS] Slot confirmed for order ${orderId}. Attempting to capture payment ${razorpay_payment_id}.`);
+                
+                const amountInPaise = Math.round(order.final_amount * 100);
+                await razorpay.payments.capture(razorpay_payment_id, amountInPaise, 'INR');
+                
+                console.log(`[CAPTURE] Successfully captured payment for order ${orderId}.`);
 
-            return res.status(200).json(new ApiResponse(200, { orderId, status: 'Pending Approval' }, "Payment successful and booking confirmed!"));
+                await handleSuccessfulPayment({ orderId, razorpay_payment_id, razorpay_signature });
+
+                return res.status(200).json(new ApiResponse(200, { orderId, status: 'Pending Approval' }, "Payment successful and booking confirmed!"));
+
+            } catch (captureError) {
+                await supabase.rpc('cancel_booking_and_release_inventory', { p_order_id: orderId });
+                await razorpay.payments.refund(razorpay_payment_id);
+                await supabase.from('orders').update({ status: 'Cancelled - Refunded', remarks: 'Payment capture failed after booking.' }).eq('id', orderId);
+                console.error(`[CRITICAL] CAPTURE FAILED for order ${orderId} after slot was confirmed.`, captureError);
+                console.log(`[ROLLBACK] Inventory slot for order ${orderId} has been released.`);
+            
+                throw new ApiError(500, "Your booking was confirmed, but the final payment capture failed. Please contact support immediately.");
+            }
 
         case 'SLOT_UNAVAILABLE':
-            console.warn(`Booking failed for order ${orderId}: SLOT_UNAVAILABLE (Race Condition). Triggering refund.`);
+            console.warn(`[SLOT UNAVAILABLE] Booking failed for order ${orderId}. Releasing payment.`);
             try {
-                const {res: refundResponse, error: refundError} = await razorpay.payments.refund(razorpay_payment_id, { receipt: `refund_order_${orderId}` });
-                if (refundError) {
-                    console.log(refundError);
-                }
-                await supabase.from('orders').update({ status: 'Cancelled - Refunded' }).eq('id', orderId);
-                console.log(`Successfully processed refund for order ${orderId}.`);
-                return res.status(409).json(new ApiResponse(409, { orderId, status: 'Cancelled - Refunded' }, "This slot became unavailable just before your payment was confirmed. Your payment has been automatically refunded."));
+                await razorpay.payments.refund(razorpay_payment_id);
+                
+                await supabase.from('orders').update({ status: 'Cancelled - Refunded', remarks: 'Slot became unavailable during payment.' }).eq('id', orderId);
+                
+                return res.status(409).json(new ApiResponse(409, { orderId, status: 'Cancelled - Refunded' }, "This slot became unavailable just before your payment was confirmed. The payment has been cancelled and you will not be charged."));
             } catch (refundError) {
-                if (refundError.error?.description?.includes('fully refunded already')) {
-                    console.warn(`Idempotent refund for order ${orderId} on an already refunded payment.`);
-                    await supabase.from('orders').update({ status: 'Cancelled - Refunded' }).eq('id', orderId);
-                    return res.status(409).json(new ApiResponse(409, { orderId, status: 'Cancelled - Refunded' }, "This slot was unavailable. Your payment had already been refunded from a previous attempt."));
-                }
-                console.error(`CRITICAL: REFUND FAILED for order ${orderId} / payment ${razorpay_payment_id}.`, refundError);
-                throw new ApiError(500, "The slot became unavailable, but we failed to process an automatic refund. Please contact support immediately with your order ID.");
+                console.error(`[CRITICAL] SLOT UNAVAILABLE for order ${orderId} AND PAYMENT RELEASE FAILED.`, refundError);
+                throw new ApiError(500, "The slot became unavailable, and we failed to cancel the payment hold. Please contact support immediately.");
             }
         
         case 'ORDER_NOT_PENDING':
@@ -206,6 +213,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
             throw new ApiError(500, "A critical server error occurred while confirming your booking. Please contact support immediately.");
     }
 });
+
 
 const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_signature }) => {
     await supabase.from('orders').update({
@@ -233,10 +241,10 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
     try {
         const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
 
-        const attachment = {
-            filename: `invoice-${fullOrderDetails.order_uid}.pdf`,
+        const attachment = [{ 
+            name: `invoice-${fullOrderDetails.order_uid}.pdf`,
             content: pdfBuffer.toString('base64'), 
-        };
+        }];
 
         await msg91Service.sendOrderConfirmationEmail(
             { 
@@ -249,11 +257,11 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
             attachment
         );
 
-
     } catch (processError) {
         console.error(`Post-payment processing failed for order ${orderId}:`, processError);
     }
 };
+
 
 const getUserOrders = asyncHandler(async (req, res) => {
     const userId = req.user.id;

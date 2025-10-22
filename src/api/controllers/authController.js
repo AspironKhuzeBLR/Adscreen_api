@@ -417,10 +417,17 @@ const completeRegistration = asyncHandler(async (req, res) => {
     );
     throw new ApiError(500, "Failed to create user profile.", profileError);
   }
+    // --- Sign in to create a session and return tokens to client ---
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
+  CurrentUser={...user, ...signInData.session};
+  console.log("CurrentUser after registration:", CurrentUser);
   res
     .status(201)
-    .json(new ApiResponse(201, { userId: user.id }, "Registration complete!"));
+    .json(new ApiResponse(201, { user: CurrentUser }, "Registration complete!"));
 });
 
 const login = asyncHandler(async (req, res) => {
@@ -428,12 +435,13 @@ const login = asyncHandler(async (req, res) => {
   if (!email || !password)
     throw new ApiError(400, "Email and password are required.");
 
-  const { data: userProfile, error: profileCheckError } = await supabase
+    const { data: userProfile, error: profileCheckError } = await supabase
         .from('profiles')
         .select('deleted_at')
         .eq('email', email)
         .single();
-    
+
+    console.log(userProfile)
     if (profileCheckError && profileCheckError.code !== 'PGRST116') {
 
         throw new ApiError(500, "An error occurred while checking user status.", profileCheckError);
@@ -448,6 +456,7 @@ const login = asyncHandler(async (req, res) => {
     email,
     password,
   });
+
   if (error) throw new ApiError(401, "Invalid email or password.", error);
 
   const { data: profile } = await supabase
@@ -824,6 +833,7 @@ const completePhoneUpdate = asyncHandler(async (req, res) => {
 const deleteAccount = asyncHandler(async (req, res) => {
   const { password } = req.body;
   const userId = req.user.id;
+  console.log("Initiating account deletion for userId:", userId);
 
   if (!password) {
     throw new ApiError(400, "Password is required to confirm account deletion.");
@@ -839,8 +849,14 @@ const deleteAccount = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User profile not found.");
   }
 
+  const { data: { user: authUser }, error: authUserError } = await supabase.auth.admin.getUserById(userId);
+  if (authUserError || !authUser) {
+    // This could happen if the user was already deleted but the token is not yet expired.
+    throw new ApiError(404, "Authentication user not found.", authUserError);
+  }
+
   const { error: signInError } = await supabase.auth.signInWithPassword({
-    email: profile.email,
+    email: authUser.email,
     password: password,
   });
 
@@ -852,12 +868,14 @@ const deleteAccount = asyncHandler(async (req, res) => {
     );
   }
   const timestamp = Date.now();
-  const anonymizedEmail = `deleted_${profile.email}_${timestamp}`;
+  const anonymizedEmail = `${userId}@deleted.example.com`;
   const anonymizedName=  `deleted_${profile.full_name}_${timestamp}`;
 
   const { error: anonymizeError } = await supabase
     .from("profiles")
     .update({
+      original_email: profile.email,
+      original_full_name: profile.full_name,
       email: anonymizedEmail,
       phone_number: null,
       full_name: anonymizedName,

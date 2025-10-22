@@ -242,10 +242,9 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
         const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
 
         const attachment = [{ 
-            name: `invoice-${fullOrderDetails.order_uid}.pdf`,
+            filename: `invoice-${fullOrderDetails.order_uid}.pdf`,
             content: pdfBuffer.toString('base64'), 
         }];
-
         await msg91Service.sendOrderConfirmationEmail(
             { 
                 ...fullOrderDetails,

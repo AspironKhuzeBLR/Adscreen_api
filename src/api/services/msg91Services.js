@@ -98,18 +98,22 @@ const sendEmail = async (templateId, recipientEmail, variables, attachment = nul
         from: { name: FROM_NAME, email: FROM_EMAIL },
     };
 
-    
-    if (attachment && attachment.content && attachment.filename) {
+   if (Array.isArray(attachment) && attachment.length > 0 && attachment[0].content && attachment[0].filename) {
+        
+        const attachmentObject = attachment[0];
+
         payload.attachments = [{
-            file: `data:application/pdf;base64,${attachment.content}`, // Data URI format
-            fileName: attachment.filename
+            file: `data:application/pdf;base64,${attachmentObject.content}`,
+            fileName: attachmentObject.filename
         }];
     }
 
     const headers = { 'authkey': AUTH_KEY, 'Content-Type': 'application/json' };
 
     try {
-        await axios.post(url, payload, { headers });
+        const response = await axios.post(url, payload, { headers });
+        console.log('MSG91 sendEmail Response:', response.data);
+        console.log('Payload Sent:', payload);
         return { success: true };
     } catch (error) {
         console.error('MSG91 sendEmail Error:', error.response ? error.response.data : error.message);

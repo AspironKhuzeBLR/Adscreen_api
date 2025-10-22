@@ -441,7 +441,6 @@ const login = asyncHandler(async (req, res) => {
         .eq('email', email)
         .single();
 
-    console.log(userProfile)
     if (profileCheckError && profileCheckError.code !== 'PGRST116') {
 
         throw new ApiError(500, "An error occurred while checking user status.", profileCheckError);

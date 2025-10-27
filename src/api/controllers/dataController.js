@@ -45,7 +45,8 @@ const getPlansForLocation = asyncHandler(async (req, res) => {
         id: item.plans.id,
         name: item.plans.name,
         description: item.plans.description,
-        duration_days: item.plans.duration_days
+        duration_days: item.plans.duration_days,
+        features: item.plans.features,
     }));
 
     res.status(200).json(new ApiResponse(200, formattedData, "Plans for the selected location retrieved successfully."));

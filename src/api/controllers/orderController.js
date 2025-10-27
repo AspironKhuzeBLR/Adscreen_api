@@ -255,6 +255,7 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
             fullOrderDetails.profiles.full_name,
             attachment
         );
+        await msg91Service.sendAdminNotificationEmail(fullOrderDetails.order_uid);
 
     } catch (processError) {
         console.error(`Post-payment processing failed for order ${orderId}:`, processError);

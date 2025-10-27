@@ -159,6 +159,26 @@ const sendOrderConfirmationEmail = async (orderDetails, recipientEmail, customer
     return sendEmail(ORDER_CONFIRM_TPL_ID, recipientEmail, variables, attachment);
 };
 
+const sendAdminNotificationEmail = async (orderId) => {
+    if(!orderId){
+        console.error('Order ID is required to send admin notification email.');
+        return;
+    }   
+
+    const ADMIN_EMAIL = process.env.ADMIN_CONTACT_EMAIL;
+    const MSG91_ORDER_CREATION_NOTIFICATION_TPL_ID = process.env.MSG91_ORDER_CREATION_NOTIFICATION_TPL_ID; 
+    const variables = {
+        ORDER_ID: orderId,
+    };
+
+    try {
+        await sendEmail(MSG91_ORDER_CREATION_NOTIFICATION_TPL_ID, ADMIN_EMAIL, variables);
+        console.log(`Admin notification email sent for order ${orderId}`);
+    } catch (emailError) {
+        console.error(`Failed to send admin notification email for order ${orderId}:`, emailError);
+    }
+};
+
 const sendContactUserConfirmationEmail = async (recipientEmail, formData) => {
     const CONTACT_USER_CONFIRM_TPL_ID = process.env.MSG91_CONTACT_USER_CONFIRM_TPL_ID;
 
@@ -224,5 +244,6 @@ module.exports = {
     sendOrderConfirmationEmail,
     sendContactUserConfirmationEmail,
     sendContactAdminNotificationEmail,
-    sendOrderStatusUpdateEmail
+    sendOrderStatusUpdateEmail,
+    sendAdminNotificationEmail,
 };

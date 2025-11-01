@@ -247,7 +247,6 @@ const forgotPassword = asyncHandler(async (req, res) => {
     .single();
 
   if (error || !profile) {
-    // SECURITY: We send a success response even if the user doesn't exist to prevent email enumeration attacks.
     return res
       .status(200)
       .json(

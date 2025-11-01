@@ -96,6 +96,8 @@ const sendEmail = async (templateId, recipientEmail, variables, attachment = nul
         template_id: templateId,
         recipients: [{ to: [{ email: recipientEmail }], variables }],
         from: { name: FROM_NAME, email: FROM_EMAIL },
+        domain: "send.adscreenhub.com" 
+
     };
 
    if (Array.isArray(attachment) && attachment.length > 0 && attachment[0].content && attachment[0].filename) {

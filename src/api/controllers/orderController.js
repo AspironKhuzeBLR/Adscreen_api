@@ -154,13 +154,12 @@ const verifyPayment = asyncHandler(async (req, res) => {
             throw new ApiError(409, `The order is in an state of (${order.status}) and booking cannot be processed.`);
     }
 
-    // --- SIGNATURE VERIFICATION (Uncomment for Production) ---
     
     const body = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSignature = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(body.toString()).digest('hex');
     if (expectedSignature !== razorpay_signature) {
-        throw new ApiError(400, "Invalid payment signature.");
         console.error(`Payment signature mismatch for order ${orderId}. Expected ${expectedSignature}, got ${razorpay_signature}.`);
+        throw new ApiError(400, "Invalid payment signature.");
     }
     
 
@@ -216,14 +215,12 @@ const verifyPayment = asyncHandler(async (req, res) => {
 
 
 const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_signature }) => {
-    // This first update remains the same.
     await supabase.from('orders').update({
         razorpay_payment_id,
         razorpay_signature,
         status: 'Pending Approval'
     }).eq('id', orderId);
 
-    // This fetch also remains the same.
     const { data: fullOrderDetails, error: detailsError } = await supabase
         .from('orders')
         .select(`

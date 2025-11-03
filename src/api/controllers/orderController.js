@@ -216,17 +216,19 @@ const verifyPayment = asyncHandler(async (req, res) => {
 
 
 const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_signature }) => {
+    // This first update remains the same.
     await supabase.from('orders').update({
         razorpay_payment_id,
         razorpay_signature,
         status: 'Pending Approval'
     }).eq('id', orderId);
 
+    // This fetch also remains the same.
     const { data: fullOrderDetails, error: detailsError } = await supabase
         .from('orders')
         .select(`
             *,
-            profiles ( full_name, email, phone_number),
+            profiles ( id, full_name, email, phone_number), 
             locations ( name ),
             plans ( name )
         `)
@@ -240,11 +242,26 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
 
     try {
         const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
+        const invoiceFileName = `invoice-${fullOrderDetails.order_uid}.pdf`;
 
+        const invoiceFilePath = `invoice/${fullOrderDetails.profiles.id}/${invoiceFileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('invoice') 
+            .upload(invoiceFilePath, pdfBuffer, {
+                contentType: 'application/pdf',
+                upsert: true 
+            });
+
+        if (uploadError) {
+            console.error(`[CRITICAL] FAILED TO UPLOAD INVOICE for order ${orderId} to storage.`, uploadError);
+        } 
+        
         const attachment = [{ 
-            filename: `invoice-${fullOrderDetails.order_uid}.pdf`,
+            name: invoiceFileName, 
             content: pdfBuffer.toString('base64'), 
         }];
+
         await msg91Service.sendOrderConfirmationEmail(
             { 
                 ...fullOrderDetails,
@@ -255,13 +272,13 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
             fullOrderDetails.profiles.full_name,
             attachment
         );
+
         await msg91Service.sendAdminNotificationEmail(fullOrderDetails.order_uid);
 
     } catch (processError) {
         console.error(`Post-payment processing failed for order ${orderId}:`, processError);
     }
 };
-
 
 const getUserOrders = asyncHandler(async (req, res) => {
     const userId = req.user.id;

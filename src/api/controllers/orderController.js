@@ -46,15 +46,15 @@ const initiateOrder = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Could not find a valid plan for this location.");
     }
     
-    // if (Number(planDetails.price) !== Number(price)) {
-    //     throw new ApiError(400, "Price mismatch. Please refresh and try again.");
-    // }
+    if (Number(planDetails.price) !== Number(price)) {
+        throw new ApiError(400, "Price mismatch. Please refresh and try again.");
+    }
     
     const durationDays = planDetails.plans.duration_days;
     const verifiedPrice = planDetails.price;
     
-    // const totalAmountIncludingGST = (verifiedPrice * 1.18);
-    totalAmountIncludingGST = 1; // for testing
+    const totalAmountIncludingGST = (verifiedPrice * 1.18);
+    // totalAmountIncludingGST = 1; // for testing
     const totalAmountInPaise = Math.round(totalAmountIncludingGST * 100);
 
     const calculatedEndDate = new Date(startDate);
@@ -124,7 +124,6 @@ const initiateOrder = asyncHandler(async (req, res) => {
 const verifyPayment = asyncHandler(async (req, res) => {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = req.body;
 
-    console.log(razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId);
 
     const { data: order, error: fetchError } = await supabase
         .from('orders')
@@ -173,8 +172,8 @@ const verifyPayment = asyncHandler(async (req, res) => {
             try {
                 console.log(`[SUCCESS] Slot confirmed for order ${orderId}. Attempting to capture payment ${razorpay_payment_id}.`);
                 
-                // const amountInPaise = Math.round(order.final_amount * 100);
-                const amountInPaise =100; // Capturing a nominal amount for testing purposes
+                const amountInPaise = Math.round(order.final_amount * 100);
+                // const amountInPaise =100; // Capturing a nominal amount for testing purposes
                 await razorpay.payments.capture(razorpay_payment_id, amountInPaise, 'INR');
                 
                 console.log(`[CAPTURE] Successfully captured payment for order ${orderId}.`);

@@ -101,7 +101,6 @@ const sendEmail = async (templateId, recipientEmail, variables, attachment = nul
 
     };
 
-    console.log('Attachment received in sendEmail:', attachment);
 
    if (Array.isArray(attachment) && attachment.length > 0 && attachment[0].content && attachment[0].filename) {
         

@@ -244,16 +244,16 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
 
         const invoiceFilePath = `invoice/${fullOrderDetails.profiles.id}/${invoiceFileName}`;
 
-        const { error: uploadError } = await supabase.storage
-            .from('invoice') 
-            .upload(invoiceFilePath, pdfBuffer, {
-                contentType: 'application/pdf',
-                upsert: true 
-            });
+        // const { error: uploadError } = await supabase.storage
+        //     .from('invoice') 
+        //     .upload(invoiceFilePath, pdfBuffer, {
+        //         contentType: 'application/pdf',
+        //         upsert: true 
+        //     });
 
-        if (uploadError) {
-            console.error(`[CRITICAL] FAILED TO UPLOAD INVOICE for order ${orderId} to storage.`, uploadError);
-        } 
+        // if (uploadError) {
+        //     console.error(`[CRITICAL] FAILED TO UPLOAD INVOICE for order ${orderId} to storage.`, uploadError);
+        // } 
         
         const attachment = [{ 
             filename: invoiceFileName, 
@@ -268,7 +268,7 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
             },
             fullOrderDetails.profiles.email,      
             fullOrderDetails.profiles.full_name,
-            attachment
+            // attachment
         );
 
         await msg91Service.sendAdminNotificationEmail(fullOrderDetails.order_uid);

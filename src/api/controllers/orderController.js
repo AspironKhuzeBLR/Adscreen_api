@@ -53,7 +53,7 @@ const initiateOrder = asyncHandler(async (req, res) => {
     const durationDays = planDetails.plans.duration_days;
     const verifiedPrice = planDetails.price;
     
-    const totalAmountIncludingGST = (verifiedPrice * 1.18);
+   const totalAmountIncludingGST = (verifiedPrice * 1.18);
     // totalAmountIncludingGST = 1; // for testing
     const totalAmountInPaise = Math.round(totalAmountIncludingGST * 100);
 
@@ -134,7 +134,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
     if (fetchError || !order) {
         throw new ApiError(404, `The order with ID ${orderId} could not be found.`);
     }
-
+    
     switch (order.status) {
         case 'Pending Approval':
         case 'Design Revise':
@@ -216,10 +216,17 @@ const verifyPayment = asyncHandler(async (req, res) => {
 
 
 const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_signature }) => {
+    const { data: invoiceNumber, error: invoiceNumError } = await supabase.rpc('get_next_invoice_number');
+
+    if (invoiceNumError || !invoiceNumber) {    
+        console.error(`[CRITICAL] FAILED TO GENERATE INVOICE NUMBER for order ${orderId}.`, invoiceNumError);
+    }
+
     await supabase.from('orders').update({
         razorpay_payment_id,
         razorpay_signature,
-        status: 'Pending Approval'
+        status: 'Pending Approval',
+        invoice_number: invoiceNumber // <-- SAVING THE NEWLY GENERATED INVOICE NUMBER
     }).eq('id', orderId);
 
     const { data: fullOrderDetails, error: detailsError } = await supabase
@@ -244,16 +251,16 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
 
         const invoiceFilePath = `invoice/${fullOrderDetails.profiles.id}/${invoiceFileName}`;
 
-        // const { error: uploadError } = await supabase.storage
-        //     .from('invoice') 
-        //     .upload(invoiceFilePath, pdfBuffer, {
-        //         contentType: 'application/pdf',
-        //         upsert: true 
-        //     });
+        const { error: uploadError } = await supabase.storage
+            .from('invoice') 
+            .upload(invoiceFilePath, pdfBuffer, {
+                contentType: 'application/pdf',
+                upsert: true 
+            });
 
-        // if (uploadError) {
-        //     console.error(`[CRITICAL] FAILED TO UPLOAD INVOICE for order ${orderId} to storage.`, uploadError);
-        // } 
+        if (uploadError) {
+            console.error(`[CRITICAL] FAILED TO UPLOAD INVOICE for order ${orderId} to storage.`, uploadError);
+        } 
         
         const attachment = [{ 
             filename: invoiceFileName, 
@@ -268,7 +275,7 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
             },
             fullOrderDetails.profiles.email,      
             fullOrderDetails.profiles.full_name,
-            // attachment
+            attachment
         );
 
         await msg91Service.sendAdminNotificationEmail(fullOrderDetails.order_uid);

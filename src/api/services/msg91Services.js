@@ -8,6 +8,9 @@ const FROM_EMAIL = process.env.MSG91_FROM_EMAIL;
 const FROM_NAME = process.env.MSG91_FROM_NAME;
 const MSG91_EMAIL_UPDATE_TPL_ID = process.env.MSG91_EMAIL_UPDATE_TPL_ID;
 const MSG91_PHONE_UPDATE_TPL_ID = process.env.MSG91_PHONE_UPDATE_TPL_ID;
+const MSG91_DESIGN_REVISED_TPL_ID = process.env.MSG91_DESIGN_REVISED_TPL_ID; // New template ID for re-upload notifications
+const ADMIN_CONTACT_EMAIL = process.env.ADMIN_CONTACT_EMAIL;
+
 
 
 const generateOtp = () => {
@@ -169,14 +172,13 @@ const sendAdminNotificationEmail = async (orderId) => {
         return;
     }   
 
-    const ADMIN_EMAIL = process.env.ADMIN_CONTACT_EMAIL;
     const MSG91_ORDER_CREATION_NOTIFICATION_TPL_ID = process.env.MSG91_ORDER_CREATION_NOTIFICATION_TPL_ID; 
     const variables = {
         ORDER_ID: orderId,
     };
 
     try {
-        await sendEmail(MSG91_ORDER_CREATION_NOTIFICATION_TPL_ID, ADMIN_EMAIL, variables);
+        await sendEmail(MSG91_ORDER_CREATION_NOTIFICATION_TPL_ID, ADMIN_CONTACT_EMAIL, variables);
         console.log(`Admin notification email sent for order ${orderId}`);
     } catch (emailError) {
         console.error(`Failed to send admin notification email for order ${orderId}:`, emailError);
@@ -199,9 +201,8 @@ const sendContactUserConfirmationEmail = async (recipientEmail, formData) => {
 
 const sendContactAdminNotificationEmail = async (formData) => {
     const CONTACT_ADMIN_NOTIFY_TPL_ID = process.env.MSG91_CONTACT_ADMIN_NOTIFY_TPL_ID;
-    const ADMIN_EMAIL = process.env.ADMIN_CONTACT_EMAIL; 
 
-    if (!ADMIN_EMAIL) {
+    if (!ADMIN_CONTACT_EMAIL) {
         console.error('ADMIN_CONTACT_EMAIL is not set in environment variables. Admin notification email cannot be sent.');
         return false;
     }
@@ -213,7 +214,7 @@ const sendContactAdminNotificationEmail = async (formData) => {
         user_message: formData.message,
     };
 
-    return sendEmail(CONTACT_ADMIN_NOTIFY_TPL_ID, ADMIN_EMAIL, variables);
+    return sendEmail(CONTACT_ADMIN_NOTIFY_TPL_ID, ADMIN_CONTACT_EMAIL, variables);
 };
 
 const sendOrderStatusUpdateEmail = async (orderDetails) => {
@@ -236,6 +237,25 @@ const sendOrderStatusUpdateEmail = async (orderDetails) => {
 
     return sendEmail(ORDER_STATUS_UPDATE_TPL_ID, recipientEmail, variables);
 };
+
+// Function specifically for sending a re-upload notification email
+const sendReuploadNotificationEmail = async (orderId) => {
+    if (!MSG91_DESIGN_REVISED_TPL_ID) {
+        console.warn("MSG91_DESIGN_REVISED_TPL_ID is not set. Re-upload notification email will not be sent.");
+        return;
+    }
+
+    const variables = {
+        ORDER_ID: orderId,
+    };
+
+    try {
+        await sendEmail(MSG91_DESIGN_REVISED_TPL_ID, ADMIN_CONTACT_EMAIL, variables);
+        console.log(`Re-upload notification email sent for Order ID: ${orderId} to ${ADMIN_CONTACT_EMAIL}`);
+    } catch (error) {
+        console.error(`Failed to send re-upload notification email for Order ID: ${orderId}`, error);
+    }
+};
 module.exports = {
     generateOtp,
     sendSmsWithOtp,
@@ -250,4 +270,5 @@ module.exports = {
     sendContactAdminNotificationEmail,
     sendOrderStatusUpdateEmail,
     sendAdminNotificationEmail,
+    sendReuploadNotificationEmail
 };

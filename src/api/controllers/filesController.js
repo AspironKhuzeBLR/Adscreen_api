@@ -3,6 +3,7 @@ const asyncHandler = require("../../utils/asyncHandler");
 const ApiError = require("../../utils/ApiError");
 const ApiResponse = require("../../utils/ApiResponse");
 const path = require("path");
+const msg91service =  require("../services/msg91Services");
 
 const BUCKET_NAME = "ad-creatives";
 
@@ -168,7 +169,7 @@ const finalizeReupload = asyncHandler(async (req, res) => {
 
   const { data: order, error: orderError } = await supabase
     .from("orders")
-    .select("id")
+    .select("id,order_uid")
     .eq("id", orderId)
     .eq("user_id", userId)
     .single();
@@ -242,6 +243,8 @@ const finalizeReupload = asyncHandler(async (req, res) => {
       );
     }
   }
+  // Send notification email to admin
+  await msg91service.sendReuploadNotificationEmail(order.order_uid);
 
   res
     .status(200)

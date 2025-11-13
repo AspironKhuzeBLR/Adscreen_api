@@ -136,44 +136,98 @@ const generateInvoicePdfBuffer = (orderData) => {
 };
 
 
-      const drawTable = () => {
-        const startY = 300;
-        const colX = { desc: 50, taxAmt: 200, tax: 350, total: 470 };
+    // ============ INVOICE TABLE (CORRECTED & FULLY COMPLIANT) ============
+const drawInvoiceTable = () => {
+    const tableTop = 300;
+    const headerLineY = tableTop + 22;
 
-        doc.moveTo(50, startY - 5).lineTo(560, startY - 5).stroke();
-        doc.font('Helvetica-Bold').fontSize(10);
-        doc.text('Description', colX.desc, startY);
-        doc.text('Taxable Amount', colX.taxAmt, startY, { align: 'center' });
-        doc.text('Total Tax', colX.tax, startY, { align: 'center' });
-        doc.text('Total', colX.total, startY, { align: 'center' });
-        doc.moveTo(50, startY + 15).lineTo(560, startY + 15).stroke();
+    const columnX = {
+        description: 50,
+        taxableAmount: 230,
+        cgst: 310,
+        sgst: 370,
+        igst: 430,
+        total: 480
+    };
+    const columnWidth = {
+        description: 200,
+        amount: 80,
+        gst: 80,
+        total: 80
+    };
 
-        // Row content
-        const taxableAmount = orderData.final_amount / 1.18;
-        const gstAmount = orderData.final_amount - taxableAmount;
-        const cgst = gstAmount / 2;
-        const sgst = gstAmount / 2;
-        const descY = startY + 30;
+    // --- Draw Headers ---
+    doc.font('Helvetica-Bold').fontSize(10)
+        .text('Description', columnX.description, tableTop, { width: columnWidth.description })
+        .text('Taxable Amount', columnX.taxableAmount, tableTop, { width: columnWidth.amount, align: 'right' })
+        .text('CGST (9%)', columnX.cgst, tableTop, { width: columnWidth.gst, align: 'right' })
+        .text('SGST (9%)', columnX.sgst, tableTop, { width: columnWidth.gst, align: 'right' })
+        .text('IGST (18%)', columnX.igst, tableTop, { width: columnWidth.gst, align: 'right' })
+        .text('Total', columnX.total, tableTop, { width: columnWidth.total, align: 'right' });
+    doc.moveTo(50, headerLineY).lineTo(580, headerLineY).stroke();
 
-        doc.font('Helvetica').fontSize(10)
-          .text(`Order #: ${orderData.order_uid}`, colX.desc, descY);
-        const serviceDesc = `Subscription for Digital Advertisement Service - ${orderData.plans.name} Plan (${orderData.locations.name})`;
-        doc.text(serviceDesc, colX.desc, descY + 15, { width: 230 });
+    // --- Core GST Calculation Logic ---
+    const taxableAmount = orderData.final_amount / 1.18;
+    const totalGstAmount = orderData.final_amount - taxableAmount;
+    let cgstAmount = 0, sgstAmount = 0, igstAmount = 0;
 
-        doc.text(`Rs. ${taxableAmount.toFixed(2)}`, colX.taxAmt, descY, { align: 'center' });
-        doc.text(`Rs. ${(cgst + sgst).toFixed(2)}`, colX.tax, descY, { align: 'center' });
-        doc.text(`Rs. ${orderData.final_amount.toFixed(2)}`, colX.total, descY, { align: 'right' });
+    let gstInfoObj = {};
+    try {
+        if (orderData.gst_info && typeof orderData.gst_info === 'object') gstInfoObj = orderData.gst_info;
+        else if (orderData.gst_info) gstInfoObj = JSON.parse(orderData.gst_info);
+    } catch { /* ignore */ }
 
-        // CGST / SGST lines
-        doc.fontSize(9)
-          .text(`CGST (9%): Rs. ${cgst.toFixed(2)}`, colX.desc, descY + 45)
-          .text(`SGST (9%): Rs. ${sgst.toFixed(2)}`, colX.desc + 120, descY + 45)
-          .text(`IGST (18%): Rs. 0.00`, colX.desc + 240, descY + 45);
+    const { stateName: companyStateName, stateCode: companyStateCode } = getStateInfoFromGSTIN(COMPANY_GSTIN);
+    const { stateCode: customerStateCode } = getStateInfoFromGSTIN(gstInfoObj.gst_in || '');
+    const delivery = JSON.parse(orderData.delivery_address);
 
-        doc.moveTo(50, descY + 65).lineTo(560, descY + 65).stroke();
+    const isBusinessInvoice = !!(customerStateCode && customerStateCode !== 'N/A');
 
-        return descY + 65;
-      };
+    if (isBusinessInvoice) {
+        // --- B2B LOGIC (Cases 1 & 2) ---
+        // Location is determined by GSTIN.
+        if (companyStateCode !== customerStateCode) {
+            igstAmount = totalGstAmount; // Inter-state B2B
+        } else {
+            cgstAmount = totalGstAmount / 2; // Intra-state B2B
+            sgstAmount = totalGstAmount / 2;
+        }
+    } else {
+        // --- B2C LOGIC (Cases 3 & 4) ---
+        // Location is determined by Delivery Address State.
+        // Compare state names (case-insensitive) for robustness.
+        if (companyStateName.toLowerCase() !== delivery.state.toLowerCase()) {
+            igstAmount = totalGstAmount; // Inter-state B2C
+        } else {
+            cgstAmount = totalGstAmount / 2; // Intra-state B2C
+            sgstAmount = totalGstAmount / 2;
+        }
+    }
+
+    // --- Draw Row Content ---
+    let itemY = headerLineY + 10;
+    const itemLineHeight = 15;
+    doc.font('Helvetica').fontSize(10);
+    doc.text(`Order #: ${orderData.order_uid}`, columnX.description, itemY);
+    itemY += itemLineHeight;
+
+    const fullDescription = `Subscription for Digital Advertisement Service - ${orderData.plans.name} Plan (${orderData.locations.name})`;
+    const descriptionHeight = doc.heightOfString(fullDescription, { width: columnWidth.description, lineGap: 3 });
+    doc.text(fullDescription, columnX.description, itemY, { width: columnWidth.description, lineGap: 3 });
+
+    const amountsY = itemY;
+
+    doc.text(`Rs. ${taxableAmount.toFixed(2)}`, columnX.taxableAmount, amountsY, { width: columnWidth.amount, align: 'right' });
+    doc.text(`Rs. ${cgstAmount.toFixed(2)}`, columnX.cgst, amountsY, { width: columnWidth.gst, align: 'right' });
+    doc.text(`Rs. ${sgstAmount.toFixed(2)}`, columnX.sgst, amountsY, { width: columnWidth.gst, align: 'right' });
+    doc.text(`Rs. ${igstAmount.toFixed(2)}`, columnX.igst, amountsY, { width: columnWidth.gst, align: 'right' });
+    doc.text(`Rs. ${orderData.final_amount.toFixed(2)}`, columnX.total, amountsY, { width: columnWidth.total, align: 'right' });
+
+    const finalTableBottomY = itemY + descriptionHeight + 10;
+    doc.moveTo(50, finalTableBottomY).lineTo(560, finalTableBottomY).stroke();
+
+    return finalTableBottomY;
+};
     const drawFooter = (tableEndY) => {
    
         const footerStartY = 750; 
@@ -191,7 +245,7 @@ const generateInvoicePdfBuffer = (orderData) => {
 
       drawHeader();
       drawCustomerDetails();
-      const tableEnd = drawTable();
+      const tableEnd = drawInvoiceTable();
       drawFooter(tableEnd);
 
       doc.end();

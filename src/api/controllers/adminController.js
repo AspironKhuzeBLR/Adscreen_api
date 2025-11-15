@@ -198,7 +198,7 @@ const createDisplayAdUploadUrl = asyncHandler(async (req, res) => {
 
   const fileExtension = path.extname(fileName);
   const uniqueFileName = `${nanoid()}${fileExtension}`;
-  const filePath = `${userId}/${uniqueFileName}`;
+  const filePath = `AD-DISPLAY/${userId}/${uniqueFileName}`;
   console.log("Generated file path:", filePath);
 
   const { data, error } = await supabase.storage

@@ -19,7 +19,7 @@ const createSignedUploadUrl = asyncHandler(async (req, res) => {
 
   const fileExtension = path.extname(fileName);
   const uniqueFileName = `${nanoid()}${fileExtension}`;
-  const filePath = `CREATIVE/${userId}/${uniqueFileName}`;
+  const filePath = `${userId}/${uniqueFileName}`;
 
   const { data, error } = await supabase.storage
     .from(BUCKET_NAME)

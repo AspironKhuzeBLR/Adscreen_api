@@ -61,7 +61,7 @@ const generateInvoicePdfBuffer = (orderData) => {
       };
 
       // ============ CUSTOMER DETAILS ============
-    const drawCustomerDetails = () => {
+  const drawCustomerDetails = () => {
     const billingY = 160;
     let gstInfoObj = {};
     try {
@@ -88,50 +88,73 @@ const generateInvoicePdfBuffer = (orderData) => {
         // --- RENDER AS A BUSINESS INVOICE ---
         const stateInfo = getStateInfoFromGSTIN(gstInfoObj.gst_in);
 
-        // The primary name is the Company Name
+        // Company Name (always present for business invoice)
         doc.text(gstInfoObj.company_name, 50, y);
         y += lineHeight;
 
+        // Address
         doc.text(`Address: ${delivery.street}, ${delivery.city}`, 50, y);
         y += lineHeight;
 
-        doc.text(`State: ${stateInfo.stateName} (Code:'${stateInfo.stateCode}')`, 50, y);
-        y += lineHeight;
+        // State (from GSTIN)
+        if (stateInfo.stateName && stateInfo.stateName !== 'N/A') {
+            doc.text(`State: ${stateInfo.stateName} (Code:'${stateInfo.stateCode}')`, 50, y);
+            y += lineHeight;
+        }
 
-        doc.text(`GSTIN: ${gstInfoObj.gst_in}`, 50, y);
-        y += lineHeight;
+        // GSTIN
+        if (gstInfoObj.gst_in) {
+            doc.text(`GSTIN: ${gstInfoObj.gst_in}`, 50, y);
+            y += lineHeight;
+        }
 
-        // The customer's name is now the contact person
-        doc.text(`Contact Name: ${orderData.profiles.full_name}`, 50, y);
-        y += lineHeight;
+        // Contact Name (from profiles.full_name)
+        if (orderData.profiles.full_name) {
+            doc.text(`Contact Name: ${orderData.profiles.full_name}`, 50, y);
+            y += lineHeight;
+        }
 
-        doc.text(`Email: ${orderData.profiles.email}`, 50, y);
-        y += lineHeight;
+        // Email
+        if (orderData.profiles.email) {
+            doc.text(`Email: ${orderData.profiles.email}`, 50, y);
+            y += lineHeight;
+        }
 
-        doc.text(`Phone: ${orderData.profiles.phone_number}`, 50, y);
+        // Phone
+        if (orderData.profiles.phone_number) {
+            doc.text(`Phone: ${orderData.profiles.phone_number}`, 50, y);
+        }
 
     } else {
         // --- RENDER AS A PERSONAL INVOICE ---
 
-        // The primary name is the Customer's Name
-        doc.text(orderData.profiles.full_name, 50, y);
-        y += lineHeight;
+        // Customer's Full Name
+        if (orderData.profiles.full_name) {
+            doc.text(orderData.profiles.full_name, 50, y);
+            y += lineHeight;
+        }
 
+        // Address
         doc.text(`Address: ${delivery.street}, ${delivery.city}`, 50, y);
         y += lineHeight;
-        
-        // Use state from delivery address since there's no GSTIN
+
+        // State (from delivery address)
         if (delivery.state) {
             doc.text(`State: ${delivery.state}`, 50, y);
             y += lineHeight;
         }
+        // Company, GSTIN, and Contact Name fields are omitted as they are for business invoices
 
-        // Company, GSTIN, and Contact Name fields are omitted for a cleaner look
+        // Email
+        if (orderData.profiles.email) {
+            doc.text(`Email: ${orderData.profiles.email}`, 50, y);
+            y += lineHeight;
+        }
 
-        doc.text(`Email: ${orderData.profiles.email}`, 50, y);
-        y += lineHeight;
-
-        doc.text(`Phone: ${orderData.profiles.phone_number}`, 50, y);
+        // Phone
+        if (orderData.profiles.phone_number) {
+            doc.text(`Phone: ${orderData.profiles.phone_number}`, 50, y);
+        }
     }
 };
 
@@ -166,7 +189,6 @@ const drawInvoiceTable = () => {
         .text('Total', columnX.total, tableTop, { width: columnWidth.total, align: 'right' });
     doc.moveTo(50, headerLineY).lineTo(580, headerLineY).stroke();
 
-    // --- Core GST Calculation Logic ---
     const taxableAmount = orderData.final_amount / 1.18;
     const totalGstAmount = orderData.final_amount - taxableAmount;
     let cgstAmount = 0, sgstAmount = 0, igstAmount = 0;
@@ -175,36 +197,35 @@ const drawInvoiceTable = () => {
     try {
         if (orderData.gst_info && typeof orderData.gst_info === 'object') gstInfoObj = orderData.gst_info;
         else if (orderData.gst_info) gstInfoObj = JSON.parse(orderData.gst_info);
-    } catch { /* ignore */ }
+    } catch { }
 
     const { stateName: companyStateName, stateCode: companyStateCode } = getStateInfoFromGSTIN(COMPANY_GSTIN);
-    const { stateCode: customerStateCode } = getStateInfoFromGSTIN(gstInfoObj.gst_in || '');
     const delivery = JSON.parse(orderData.delivery_address);
 
-    const isBusinessInvoice = !!(customerStateCode && customerStateCode !== 'N/A');
+    // Determine the customer's state for GST calculation
+    let customerStateForGstComparison = 'N/A';
+    const isBusinessInvoice = !!(gstInfoObj.gst_in); // Simplified check for business invoice
 
     if (isBusinessInvoice) {
-        // --- B2B LOGIC (Cases 1 & 2) ---
-        // Location is determined by GSTIN.
-        if (companyStateCode !== customerStateCode) {
-            igstAmount = totalGstAmount; // Inter-state B2B
-        } else {
-            cgstAmount = totalGstAmount / 2; // Intra-state B2B
-            sgstAmount = totalGstAmount / 2;
-        }
+        const { stateName: customerGstStateName, stateCode: customerGstStateCode } = getStateInfoFromGSTIN(gstInfoObj.gst_in);
+        customerStateForGstComparison = customerGstStateName;
     } else {
-        // --- B2C LOGIC (Cases 3 & 4) ---
-        // Location is determined by Delivery Address State.
-        // Compare state names (case-insensitive) for robustness.
-        if (companyStateName.toLowerCase() !== delivery.state.toLowerCase()) {
-            igstAmount = totalGstAmount; // Inter-state B2C
-        } else {
-            cgstAmount = totalGstAmount / 2; // Intra-state B2C
-            sgstAmount = totalGstAmount / 2;
-        }
+        // For personal orders, use the state from the delivery address
+        customerStateForGstComparison = delivery.state || 'N/A'; // Ensure it's not undefined
     }
 
-    // --- Draw Row Content ---
+    // Convert both state names to lowercase for robust comparison
+    const companyStateLower = companyStateName.toLowerCase();
+    const customerStateLower = customerStateForGstComparison.toLowerCase();
+
+    // Now apply the GST logic based on the refined state comparison
+    if (customerStateLower === 'n/a' || companyStateLower !== customerStateLower) { // If customer state is unknown or different
+        igstAmount = totalGstAmount;
+    } else { // If customer state matches company state (both within Karnataka or same state)
+        cgstAmount = totalGstAmount / 2;
+        sgstAmount = totalGstAmount / 2;
+    }
+
     let itemY = headerLineY + 10;
     const itemLineHeight = 15;
     doc.font('Helvetica').fontSize(10);
@@ -228,6 +249,7 @@ const drawInvoiceTable = () => {
 
     return finalTableBottomY;
 };
+
     const drawFooter = (tableEndY) => {
    
         const footerStartY = 750; 

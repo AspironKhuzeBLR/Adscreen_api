@@ -277,7 +277,7 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
             },
             fullOrderDetails.profiles.email,      
             fullOrderDetails.profiles.full_name,
-            attachment
+            // attachment
         );
 
         await msg91Service.sendAdminNotificationEmail(fullOrderDetails.order_uid);

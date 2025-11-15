@@ -19,7 +19,7 @@ const createSignedUploadUrl = asyncHandler(async (req, res) => {
 
   const fileExtension = path.extname(fileName);
   const uniqueFileName = `${nanoid()}${fileExtension}`;
-  const filePath = `${userId}/${uniqueFileName}`;
+  const filePath = `CREATIVE/${userId}/${uniqueFileName}`;
 
   const { data, error } = await supabase.storage
     .from(BUCKET_NAME)
@@ -138,7 +138,7 @@ const createReuploadUrl = asyncHandler(async (req, res) => {
   }
   const fileExtension = path.extname(fileName);
   const uniqueFileName = `${nanoid()}${fileExtension}`;
-  const filePath = `${userId}/${uniqueFileName}`;
+  const filePath = `RE-CREATIVE/${userId}/${uniqueFileName}`;
 
   const { data, error } = await supabase.storage
     .from(BUCKET_NAME)

@@ -189,6 +189,7 @@ const createDisplayAdUploadUrl = asyncHandler(async (req, res) => {
   const { nanoid } = await import("nanoid");
   const { orderId } = req.params;
   const { fileName, fileType } = req.body;
+  const userId = req.user.id;
 
   if (!fileName || !fileType) {
     throw new ApiError(400, "fileName and fileType are required.");
@@ -196,7 +197,7 @@ const createDisplayAdUploadUrl = asyncHandler(async (req, res) => {
 
   const fileExtension = path.extname(fileName);
   const uniqueFileName = `${nanoid()}${fileExtension}`;
-  const filePath = `AD-DISPLAY/${orderId}/${uniqueFileName}`;
+  const filePath = `AD-DISPLAY/${userId}/${uniqueFileName}`;
 
   const { data, error } = await supabase.storage
     .from(BUCKET_NAME)

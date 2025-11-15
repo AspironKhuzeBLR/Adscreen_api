@@ -134,6 +134,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
     if (fetchError || !order) {
         throw new ApiError(404, `The order with ID ${orderId} could not be found.`);
     }
+    await handleSuccessfulPayment({ orderId, razorpay_payment_id, razorpay_signature });
 
     switch (order.status) {
         case 'Pending Approval':
@@ -248,9 +249,10 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
     try {
         const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
         const invoiceFileName = `invoice-${fullOrderDetails.order_uid}.pdf`;
+        console.log(fullOrderDetails.profiles);
 
         const invoiceFilePath = `invoice/${fullOrderDetails.profiles.id}/${invoiceFileName}`;
-
+        console.log(invoiceFilePath);
         const { error: uploadError } = await supabase.storage
             .from('invoice') 
             .upload(invoiceFilePath, pdfBuffer, {

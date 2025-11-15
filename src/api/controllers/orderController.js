@@ -217,17 +217,17 @@ const verifyPayment = asyncHandler(async (req, res) => {
 
 
 const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_signature }) => {
-    // const { data: invoiceNumber, error: invoiceNumError } = await supabase.rpc('get_next_invoice_number');
+    const { data: invoiceNumber, error: invoiceNumError } = await supabase.rpc('get_next_invoice_number');
 
-    // if (invoiceNumError || !invoiceNumber) {    
-    //     console.error(`[CRITICAL] FAILED TO GENERATE INVOICE NUMBER for order ${orderId}.`, invoiceNumError);
-    // }
+    if (invoiceNumError || !invoiceNumber) {    
+        console.error(`[CRITICAL] FAILED TO GENERATE INVOICE NUMBER for order ${orderId}.`, invoiceNumError);
+    }
 
     await supabase.from('orders').update({
         razorpay_payment_id,
         razorpay_signature,
         status: 'Pending Approval',
-        // invoice_number: invoiceNumber // <-- SAVING THE NEWLY GENERATED INVOICE NUMBER
+        invoice_number: invoiceNumber // <-- SAVING THE NEWLY GENERATED INVOICE NUMBER
     }).eq('id', orderId);
 
     const { data: fullOrderDetails, error: detailsError } = await supabase
@@ -264,10 +264,10 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
             console.error(`[CRITICAL] FAILED TO UPLOAD INVOICE for order ${orderId} to storage.`, uploadError);
         } 
         
-        // const attachment = [{ 
-        //     filename: invoiceFileName, 
-        //     content: pdfBuffer.toString('base64'), 
-        // }];
+        const attachment = [{ 
+            filename: invoiceFileName, 
+            content: pdfBuffer.toString('base64'), 
+        }];
 
         await msg91Service.sendOrderConfirmationEmail(
             { 
@@ -277,7 +277,7 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
             },
             fullOrderDetails.profiles.email,      
             fullOrderDetails.profiles.full_name,
-            // attachment
+            attachment
         );
 
         await msg91Service.sendAdminNotificationEmail(fullOrderDetails.order_uid);

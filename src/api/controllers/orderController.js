@@ -134,7 +134,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
     if (fetchError || !order) {
         throw new ApiError(404, `The order with ID ${orderId} could not be found.`);
     }
-    await handleSuccessfulPayment({ orderId, razorpay_payment_id, razorpay_signature });
+    // await handleSuccessfulPayment({ orderId, razorpay_payment_id, razorpay_signature });
 
     switch (order.status) {
         case 'Pending Approval':

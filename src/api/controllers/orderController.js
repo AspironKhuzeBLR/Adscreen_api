@@ -7,6 +7,9 @@ const ApiResponse = require("../../utils/ApiResponse");
 const msg91Service = require("../services/msg91Services");
 const {generateInvoicePdfBuffer} = require("../services/invoiceServices"); // Import the invoice generation service
 
+// //TESTING TO BE REMOVED
+// const fs = require('fs');
+
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -25,7 +28,9 @@ const initiateOrder = asyncHandler(async (req, res) => {
         deliveryAddress,
         gstInfo,
         creativeFilePath,
-        creativeFileName
+        creativeFileName,
+        couponCode 
+
     } = req.body;
     
     const userId = req.user.id;
@@ -134,6 +139,8 @@ const verifyPayment = asyncHandler(async (req, res) => {
     if (fetchError || !order) {
         throw new ApiError(404, `The order with ID ${orderId} could not be found.`);
     }
+
+    //TESTING TO BE REMOVED
     // await handleSuccessfulPayment({ orderId, razorpay_payment_id, razorpay_signature });
 
     switch (order.status) {
@@ -247,9 +254,17 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
     }
 
     try {
+        
+        console.log("Full order details:",fullOrderDetails);
+
         const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
         const invoiceFileName = `invoice-${fullOrderDetails.order_uid}.pdf`;
-        console.log(fullOrderDetails.profiles);
+
+        // FOR TESTING
+        // For verification, save a local copy.
+        // fs.writeFileSync('test-invoice-local.pdf', pdfBuffer);
+        // console.log("   -> Saved a local copy as 'test-invoice-local.pdf'");
+        
 
         const invoiceFilePath = `invoice/${fullOrderDetails.profiles.id}/${invoiceFileName}`;
         console.log(invoiceFilePath);
@@ -349,4 +364,46 @@ const getUserOrders = asyncHandler(async (req, res) => {
         )
     );
 });
-module.exports = { initiateOrder, verifyPayment, getUserOrders };
+
+const validateCoupon = asyncHandler(async (req, res) => {
+    const { couponCode } = req.params;
+    const { orderAmount } = req.query; // Pass the current order amount for validation
+
+    if (!couponCode) {
+        throw new ApiError(400, "Coupon code is required.");
+    }
+
+    const { data: coupon, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', couponCode.trim())
+        .single();
+
+    if (error || !coupon) {
+        throw new ApiError(404, "Invalid or expired coupon code.");
+    }
+
+    if (!coupon.is_active) {
+        throw new ApiError(400, "This coupon is no longer active.");
+    }
+
+    const now = new Date();
+    if (new Date(coupon.valid_until) < now || new Date(coupon.valid_from) > now) {
+        throw new ApiError(400, "This coupon is not valid at this time.");
+    }
+
+    if (coupon.max_uses && coupon.uses_count >= coupon.max_uses) {
+        throw new ApiError(400, "This coupon has reached its usage limit.");
+    }
+
+    if (orderAmount && Number(orderAmount) < Number(coupon.min_order_amount)) {
+        throw new ApiError(400, `Minimum order amount of ${coupon.min_order_amount} is required.`);
+    }
+
+    res.status(200).json(new ApiResponse(200, {
+        discountPercentage: coupon.discount_percentage,
+        maxDiscountAmount: coupon.max_discount_amount
+    }, "Coupon applied successfully."));
+});
+
+module.exports = { initiateOrder, verifyPayment, getUserOrders, validateCoupon };   

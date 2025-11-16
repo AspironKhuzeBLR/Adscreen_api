@@ -10,10 +10,10 @@ const { generateInvoicePdfBuffer } = require('./src/api/services/invoiceServices
 // -----------------------------------------------------------------------------
 // IMPORTANT: You MUST provide a real User ID and a valid JWT for that user.
 const TEST_USER_ID = '3d4a1bc4-0d4a-4150-95c0-8a3038711456'; // e.g., 'a1b2c3d4-e5f6-7890-abcd-1234567890ab'
-const TEST_USER_JWT = "eyJhbGciOiJIUzI1NiIsImtpZCI6IkwrTkR6ZXE2NEYrMDNlSDAiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2VjeWZvdnh0amN6YXVnbXNzemloLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIzZDRhMWJjNC0wZDRhLTQxNTAtOTVjMC04YTMwMzg3MTE0NTYiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzYyNjc3NDM4LCJpYXQiOjE3NjI2NzM4MzgsImVtYWlsIjoic2h1YmhhbXNhbG1hbjE0M0BnbWFpbC5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc2MjY3MzgzN31dLCJzZXNzaW9uX2lkIjoiZmRlN2QzZGMtZGI3MS00NjE2LTkwNGUtMTdlOTY2YWVkNzE5IiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.tMRveQ2gi4i8Z3Ezf-DLySjlWjhLp60X4D9_Q0sILxA"
+const TEST_USER_JWT = "eyJhbGciOiJIUzI1NiIsImtpZCI6IkwrTkR6ZXE2NEYrMDNlSDAiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2VjeWZvdnh0amN6YXVnbXNzemloLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIzZDRhMWJjNC0wZDRhLTQxNTAtOTVjMC04YTMwMzg3MTE0NTYiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzYzMzE0NTg3LCJpYXQiOjE3NjMzMTA5ODcsImVtYWlsIjoic2h1YmhhbXNhbG1hbjE0M0BnbWFpbC5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc2MzMxMDk4N31dLCJzZXNzaW9uX2lkIjoiMTE4ZThjOGUtMDA3OC00NDlkLWE1OTEtYTM2ZTRjMGRiNzQyIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.ENEGkR3-UiBjMVQHNc3zyj10EKm40sTTdxDMBibDVNY";
 const createDummyOrder = (userId) => ({
     id: 999,
-    order_uid: Math.floor(10000 + Math.random() * 90000).toString(),
+    order_uid: Math.floor(10000 + Math.random() * 90000).toString(),            
     user_id: userId,
     created_at: new Date().toISOString(),
     total_cost: 2500.00,
@@ -29,14 +29,14 @@ const createDummyOrder = (userId) => ({
     locations: { name: 'Adugodi Towards Koramangala' },
     plans: { name: 'Spark Plan' },
 
-    company_name: 'Compamy Name Pvt Ltd',
-    gst_info: '29ABCDE1234F5Z6', // Karnataka GSTIN
+    
+    gst_info:"N/A", //{"company_name": 'Compamy Name Pvt Ltd',"gst_in":'27ABCDE1234F5Z6'}, // Karnataka GSTIN
 
     delivery_address: JSON.stringify({
         street: '123 Main Street',
-        city: 'Bengaluru',
-        state: 'Karnataka',
-        zip: '560001',
+        city: 'Durg',
+        state: 'Chhattisgarh',
+        zip: '496001',
         country: 'India'
     }),
 
@@ -60,7 +60,7 @@ const runTest = async () => {
         // --- Step 1: Authenticate the Supabase client as our test user ---
         // This is CRITICAL for the RLS policy to work.
         console.log(`Authenticating as user: ${TEST_USER_ID}...`);
-        const { error: authError } = await supabase.auth.setSession({ access_token: TEST_USER_JWT, refresh_token: 'doxnmuyxjh2e' });
+        const { error: authError } = await supabase.auth.setSession({ access_token: TEST_USER_JWT, refresh_token: 'ow526mw2yatj' });
         if (authError) {
             throw new Error(`Authentication failed: ${authError.message}`);
         }
@@ -81,7 +81,7 @@ const runTest = async () => {
         // This path structure MUST match what your RLS policy expects.
         const invoiceFilePath = `${dummyOrder.user_id}/${invoiceFileName}`;
 
-        console.log(`Uploading to Supabase Storage at path: invoices/${invoiceFilePath}...`);
+        console.log(`Uploading to Supabase Storage at path: invoice/${invoiceFilePath}...`);
         const { error: uploadError } = await supabase.storage
             .from('invoice')
             .upload(invoiceFilePath, pdfBuffer, {

@@ -16,8 +16,8 @@ const createDummyOrder = (userId) => ({
     order_uid: Math.floor(10000 + Math.random() * 90000).toString(),            
     user_id: userId,
     created_at: new Date().toISOString(),
-    total_cost: 2500.00,
-    final_amount: 2950.00,
+    total_cost: 25000.00,
+    final_amount: 29500.00,
 
     profiles: {
         user_id: userId,
@@ -30,12 +30,12 @@ const createDummyOrder = (userId) => ({
     plans: { name: 'Spark Plan' },
 
     
-    gst_info:"N/A", //{"company_name": 'Compamy Name Pvt Ltd',"gst_in":'27ABCDE1234F5Z6'}, // Karnataka GSTIN
+    gst_info:{"company_name": 'Compamy Name Pvt Ltd',"gst_in":'29ABCDE1234F5Z6'}, // Karnataka GSTIN
 
     delivery_address: JSON.stringify({
-        street: '123 Main Street',
+        street: 'Test Customer Non Karnataka\nState DropDown selected haryana\n GSTIn for tamilnadu 33 ',
         city: 'Durg',
-        state: 'Chhattisgarh',
+        state: 'Karnataka',
         zip: '496001',
         country: 'India'
     }),

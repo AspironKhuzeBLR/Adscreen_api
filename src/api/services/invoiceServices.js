@@ -92,9 +92,7 @@ const generateInvoicePdfBuffer = (orderData) => {
         doc.text(gstInfoObj.company_name, 50, y);
         y += lineHeight;
 
-        // Address
-        doc.text(`Address: ${delivery.street}, ${delivery.city}`, 50, y);
-        y += lineHeight;
+      
 
         // State (from GSTIN)
         if (stateInfo.stateName && stateInfo.stateName !== 'N/A') {
@@ -124,6 +122,10 @@ const generateInvoicePdfBuffer = (orderData) => {
         if (orderData.profiles.phone_number) {
             doc.text(`Phone: ${orderData.profiles.phone_number}`, 50, y);
         }
+        
+        y += lineHeight;
+        doc.text(`Address: ${delivery.street}, ${delivery.city}`, 50, y);
+      
 
     } else {
         // --- RENDER AS A PERSONAL INVOICE ---
@@ -134,9 +136,7 @@ const generateInvoicePdfBuffer = (orderData) => {
             y += lineHeight;
         }
 
-        // Address
-        doc.text(`Address: ${delivery.street}, ${delivery.city}`, 50, y);
-        y += lineHeight;
+    
 
         // State (from delivery address)
         if (delivery.state) {
@@ -155,6 +155,10 @@ const generateInvoicePdfBuffer = (orderData) => {
         if (orderData.profiles.phone_number) {
             doc.text(`Phone: ${orderData.profiles.phone_number}`, 50, y);
         }
+            // Address
+        y += lineHeight;
+        doc.text(`Address: ${delivery.street}, ${delivery.city}`, 50, y);
+       
     }
 };
 
@@ -167,26 +171,26 @@ const drawInvoiceTable = () => {
     const columnX = {
         description: 50,
         taxableAmount: 230,
-        cgst: 310,
+        cgst: 300,
         sgst: 370,
-        igst: 430,
-        total: 480
+        igst: 440,
+        total: 515
     };
     const columnWidth = {
-        description: 200,
-        amount: 80,
-        gst: 80,
-        total: 80
+        description: 170,
+        amount: 60,
+        gst: 60,
+        total: 60
     };
 
     // --- Draw Headers ---
     doc.font('Helvetica-Bold').fontSize(10)
         .text('Description', columnX.description, tableTop, { width: columnWidth.description })
-        .text('Taxable Amount', columnX.taxableAmount, tableTop, { width: columnWidth.amount, align: 'right' })
-        .text('CGST (9%)', columnX.cgst, tableTop, { width: columnWidth.gst, align: 'right' })
-        .text('SGST (9%)', columnX.sgst, tableTop, { width: columnWidth.gst, align: 'right' })
-        .text('IGST (18%)', columnX.igst, tableTop, { width: columnWidth.gst, align: 'right' })
-        .text('Total', columnX.total, tableTop, { width: columnWidth.total, align: 'right' });
+        .text('Taxable Amount', columnX.taxableAmount, tableTop, { width: columnWidth.amount, align: 'center' })
+        .text('CGST (9%)', columnX.cgst, tableTop, { width: columnWidth.gst, align: 'center' })
+        .text('SGST (9%)', columnX.sgst, tableTop, { width: columnWidth.gst, align: 'center' })
+        .text('IGST (18%)', columnX.igst, tableTop, { width: columnWidth.gst, align: 'center' })
+        .text('Total', columnX.total, tableTop, { width: columnWidth.total, align: 'center' });
     doc.moveTo(50, headerLineY).lineTo(580, headerLineY).stroke();
 
     const taxableAmount = orderData.final_amount / 1.18;
@@ -245,7 +249,7 @@ const drawInvoiceTable = () => {
     doc.text(`Rs. ${orderData.final_amount.toFixed(2)}`, columnX.total, amountsY, { width: columnWidth.total, align: 'right' });
 
     const finalTableBottomY = itemY + descriptionHeight + 10;
-    doc.moveTo(50, finalTableBottomY).lineTo(560, finalTableBottomY).stroke();
+    doc.moveTo(50, finalTableBottomY).lineTo(580, finalTableBottomY).stroke();
 
     return finalTableBottomY;
 };
@@ -256,8 +260,8 @@ const drawInvoiceTable = () => {
 
         const grandTotalY = tableEndY + 20;
         doc.font('Helvetica-Bold').fontSize(12)
-          .text('Grand Total', 390, grandTotalY, { width: 100, align: 'right' })
-          .text(`Rs. ${orderData.final_amount.toFixed(2)}`, 490, grandTotalY, { width: 70, align: 'right' });
+          .text('Grand Total:', 360, grandTotalY, { width: 80, align: 'right' })
+          .text(`Rs. ${orderData.final_amount.toFixed(2)}`, 440, grandTotalY, { width: 100, align: 'right' });
 
         doc.font('Helvetica').fontSize(8);
         doc.text('This is a computer-generated invoice and does not require a signature or stamp.', 50, footerStartY, { align: 'center' });

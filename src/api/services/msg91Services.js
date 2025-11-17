@@ -119,8 +119,8 @@ const sendEmail = async (templateId, recipientEmail, variables, attachment = nul
 
     try {
         const response = await axios.post(url, payload, { headers });
-        console.log('MSG91 sendEmail Response:', response.data);
-        console.log('Payload Sent:', payload);
+        // console.log('MSG91 sendEmail Response:', response.data);
+        // console.log('Payload Sent:', payload);
         return { success: true };
     } catch (error) {
         console.error('MSG91 sendEmail Error:', error.response ? error.response.data : error.message);

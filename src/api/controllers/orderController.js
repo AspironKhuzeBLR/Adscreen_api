@@ -255,7 +255,6 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
 
     try {
         
-        console.log("Full order details:",fullOrderDetails);
 
         const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
         const invoiceFileName = `invoice-${fullOrderDetails.order_uid}.pdf`;

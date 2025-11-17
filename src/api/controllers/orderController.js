@@ -142,7 +142,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
 
     //TESTING TO BE REMOVED
     // await handleSuccessfulPayment({ orderId, razorpay_payment_id, razorpay_signature });
-
+    
     switch (order.status) {
         case 'Pending Approval':
         case 'Design Revise':
@@ -266,7 +266,7 @@ const handleSuccessfulPayment = async ({ orderId, razorpay_payment_id, razorpay_
         // console.log("   -> Saved a local copy as 'test-invoice-local.pdf'");
         
 
-        const invoiceFilePath = `invoice/${fullOrderDetails.profiles.id}/${invoiceFileName}`;
+        const invoiceFilePath = `${fullOrderDetails.profiles.id}/${invoiceFileName}`;
         console.log(invoiceFilePath);
         const { error: uploadError } = await supabase.storage
             .from('invoice') 

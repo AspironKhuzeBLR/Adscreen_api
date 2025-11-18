@@ -9,5 +9,5 @@ router.use(protect);
 router.post('/initiate', initiateOrder);
 router.post('/verify-payment', verifyPayment);
 router.get('/', getUserOrders); 
-router.get('/coupons/validate/:couponCode?orderAmount=<amount>', validateCoupon);
+router.get('/validate/:couponCode',validateCoupon);
 module.exports = router;

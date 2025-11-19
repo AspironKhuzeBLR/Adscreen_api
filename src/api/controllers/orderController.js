@@ -39,196 +39,183 @@ const initiateOrder = asyncHandler(async (req, res) => {
     );
   }
 
-  const { data: planDetails, error: planDetailsError } = await supabase
-    .from("location_plan_pricing")
-    .select("price, plans(duration_days)")
-    .eq("location_id", locationId)
-    .eq("plan_id", planId)
-    .eq("is_active", true)
-    .single();
-
-  if (planDetailsError || !planDetails) {
-    throw new ApiError(404, "Could not find a valid plan for this location.");
-  }
-
-  if (Number(planDetails.price) !== Number(price)) {
-    throw new ApiError(400, "Price mismatch. Please refresh and try again.");
-  }
-
-  const durationDays = planDetails.plans.duration_days;
-  const verifiedPrice = planDetails.price;
-  let discountAmount = 0;
-  let appliedCoupon = null;
-
-  if (couponCode) {
-    // 1. Fetch the coupon
-    const { data: coupon, error: couponError } = await supabase
-      .from("coupons")
-      .select("*")
-      .eq("code", couponCode.trim().toUpperCase())
+  try {
+    const { data: planDetails, error: planDetailsError } = await supabase
+      .from("location_plan_pricing")
+      .select("price, plans(duration_days)")
+      .eq("location_id", locationId)
+      .eq("plan_id", planId)
+      .eq("is_active", true)
       .single();
 
-    // 2. Perform ALL checks again
-    if (coupon && !couponError && coupon.is_active) {
-      const now = new Date();
-      const isWithinDateRange =
-        new Date(coupon.valid_until) >= now &&
-        new Date(coupon.valid_from) <= now;
-      const hasNotExceededMaxUses =
-        coupon.max_uses === null || coupon.uses_count < coupon.max_uses;
-      const meetsMinOrderAmount =
-        Number(verifiedPrice) >= Number(coupon.min_order_amount);
-
-      let hasBeenUsedByUser = false;
-      if (coupon.is_single_use_per_user) {
-        const { data: usage,count, error: usageError } = await supabase
-          .from("user_coupon_usage")
-          .select("id", { count: "exact" })
-          .eq("user_id", userId)
-          .eq("coupon_id", coupon.id);
-        if (!usageError && count > 0) {
-          hasBeenUsedByUser = true;
-        }
-      }
-
-
-      // 3. If all conditions are met, calculate the discount
-      if (
-        isWithinDateRange &&
-        hasNotExceededMaxUses &&
-        meetsMinOrderAmount &&
-        !hasBeenUsedByUser
-      ) {
-        let calculatedDiscount =
-          (verifiedPrice * coupon.discount_percentage) / 100;
-
-        // Apply max discount cap if it exists
-        if (
-          coupon.max_discount_amount &&
-          calculatedDiscount > coupon.max_discount_amount
-        ) {
-          calculatedDiscount = coupon.max_discount_amount;
-        }
-
-        discountAmount = calculatedDiscount;
-        appliedCoupon = coupon; // Keep the coupon object for later
-      }
+    if (planDetailsError || !planDetails) {
+      throw new ApiError(404, "Could not find a valid plan for this location.");
     }
-    // Note: We fail silently here. If the coupon is invalid, the discount is simply 0.
-    // You could throw an error if you prefer the order to fail completely.
-  }
 
-  // --- Final Amount Calculation ---
-  const priceAfterDiscount = verifiedPrice - discountAmount;
-  const totalAmountIncludingGST = priceAfterDiscount * 1.18;
-  const totalAmountInPaise = Math.round(totalAmountIncludingGST * 100);
+    if (Number(planDetails.price) !== Number(price)) {
+      throw new ApiError(400, "Price mismatch. Please refresh and try again.");
+    }
 
-  const calculatedEndDate = new Date(startDate);
-  calculatedEndDate.setDate(calculatedEndDate.getDate() + durationDays - 1);
-  const endDateString = calculatedEndDate.toISOString().split("T")[0];
-  const { data: orderUID, error: uidError } = await supabase.rpc(
-    "get_next_order_uid"
-  );
+    const durationDays = planDetails.plans.duration_days;
+    const verifiedPrice = planDetails.price;
+    let discountAmount = 0;
+    let appliedCoupon = null;
 
-  if (uidError || !orderUID) {
-    throw new ApiError(500, "Could not reserve a new Order ID.", uidError);
-  }
+    if (couponCode) {
+      // 1. Fetch the coupon
+      const { data: coupon, error: couponError } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("code", couponCode.trim().toUpperCase())
+        .single();
 
-  const rpOrder = await razorpay.orders.create({
-    amount: totalAmountInPaise,
-    currency: "INR",
-    receipt: orderUID,
-    notes: { userId, planId, locationId },
-  });
+      // 2. Perform ALL checks again
+      if (coupon && !couponError && coupon.is_active) {
+        console.log("Coupon found:", verifiedPrice, coupon);
+        const now = new Date();
+        const isWithinDateRange =
+          new Date(coupon.valid_until) >= now &&
+          new Date(coupon.valid_from) <= now;
+        const hasNotExceededMaxUses =
+          coupon.max_uses === null || coupon.uses_count < coupon.max_uses;
+        const meetsMinOrderAmount =
+          Number(verifiedPrice) >= Number(coupon.min_order_amount);
 
-  const { data: urlData } = supabase.storage
-    .from("ad-creatives")
-    .getPublicUrl(creativeFilePath);
+        let hasBeenUsedByUser = false;
+        if (coupon.is_single_use_per_user) {
+          const {
+            data: usage,
+            count,
+            error: usageError,
+          } = await supabase
+            .from("user_coupon_usage")
+            .select("id", { count: "exact" })
+            .eq("user_id", userId)
+            .eq("coupon_id", coupon.id);
+          if (!usageError && count > 0) {
+            hasBeenUsedByUser = true;
+          }
+        }
+        
+        // 3. If all conditions are met, calculate the discount
+        if (
+          isWithinDateRange &&
+          hasNotExceededMaxUses &&
+          meetsMinOrderAmount &&
+          !hasBeenUsedByUser
+        ) {
+          let calculatedDiscount =
+            (verifiedPrice * coupon.discount_percentage) / 100;
 
-  const publicUrl = urlData.publicUrl;
+          // Apply max discount cap if it exists
+          if (
+            coupon.max_discount_amount &&
+            calculatedDiscount > coupon.max_discount_amount
+          ) {
+            calculatedDiscount = coupon.max_discount_amount;
+          }
 
-  const { data: newOrder, error: orderError } = await supabase
-    .from("orders")
-    .insert({
+          discountAmount = calculatedDiscount;
+          appliedCoupon = coupon; // Keep the coupon object for later
+        }
+      }
+      // Note: We fail silently here. If the coupon is invalid, the discount is simply 0.
+      // You could throw an error if you prefer the order to fail completely.
+    }
+
+    // --- Final Amount Calculation ---
+    const priceAfterDiscount = verifiedPrice - discountAmount;
+    const totalAmountIncludingGST = priceAfterDiscount * 1.18;
+    const totalAmountInPaise = Math.round(totalAmountIncludingGST * 100);
+
+    const calculatedEndDate = new Date(startDate);
+    calculatedEndDate.setDate(calculatedEndDate.getDate() + durationDays - 1);
+    const endDateString = calculatedEndDate.toISOString().split("T")[0];
+    const { data: orderUID, error: uidError } = await supabase.rpc(
+      "get_next_order_uid"
+    );
+
+    if (uidError || !orderUID) {
+      throw new ApiError(500, "Could not reserve a new Order ID.", uidError);
+    }
+    if (totalAmountInPaise < 100) {
+  throw new ApiError(400, `Order amount (₹${totalAmountInPaise / 100}) is below Razorpay minimum of ₹1.`);
+}
+
+    const rpOrder = await razorpay.orders.create({
+      amount: totalAmountInPaise,
+      currency: "INR",
+      receipt: orderUID,
+      notes: { userId, planId, locationId },
+    });
+
+    const { data: urlData } = supabase.storage
+      .from("ad-creatives")
+      .getPublicUrl(creativeFilePath);
+
+    const publicUrl = urlData.publicUrl;
+
+    const { data: newOrder, error: orderError } = await supabase
+      .from("orders")
+      .insert({
+        user_id: userId,
+        plan_id: planId,
+        location_id: locationId,
+        start_date: startDate,
+        end_date: endDateString,
+        total_cost: price,
+        coupon_code: appliedCoupon ? appliedCoupon.code : null, // Store the applied coupon
+        final_amount: totalAmountIncludingGST,
+        delivery_address: deliveryAddress,
+        gst_info: gstInfo,
+        status: "Pending Payment",
+        order_uid: orderUID,
+        razorpay_order_id: rpOrder.id,
+        creative_image_url: publicUrl,
+      })
+      .select()
+      .single();
+
+    if (orderError) {
+      throw new ApiError(
+        500,
+        "Could not create the initial order record.",
+        orderError
+      );
+    }
+
+    const { error: creativeError } = await supabase.from("creatives").insert({
+      order_id: newOrder.id,
       user_id: userId,
-      plan_id: planId,
-      location_id: locationId,
-      start_date: startDate,
-      end_date: endDateString,
-      total_cost: price,
-      coupon_code: appliedCoupon ? appliedCoupon.code : null, // Store the applied coupon
-      final_amount: totalAmountIncludingGST,
-      delivery_address: deliveryAddress,
-      gst_info: gstInfo,
-      status: "Pending Payment",
-      order_uid: orderUID,
-      razorpay_order_id: rpOrder.id,
-      creative_image_url: publicUrl,
-    })
-    .select()
-    .single();
+      file_path: creativeFilePath,
+      file_name: creativeFileName,
+      doc_type: "design",
+      image_url: publicUrl,
+    });
 
-  if (orderError) {
-    throw new ApiError(
-      500,
-      "Could not create the initial order record.",
-      orderError
+    if (creativeError) {
+      await supabase.from("orders").delete().eq("id", newOrder.id);
+      throw new ApiError(
+        500,
+        "Could not link the creative file to the order. The order has been cancelled.",
+        creativeError
+      );
+    }
+
+    res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          order: newOrder,
+          razorpayOrder: rpOrder,
+        },
+        "Order initiated. Please proceed to payment."
+      )
     );
+  } catch (err) {
+    console.error("[initiateOrder] ERROR:", err);
+    throw err;
   }
-
-//   // --- **IMPORTANT**: Log Coupon Usage After Successful Order Creation ---
-//    if (appliedCoupon) {
-//         // 1. Increment the global uses_count by calling our new database function
-//         const { error: incrementError } = await supabase
-//             .rpc('increment_coupon_uses', { coupon_id_to_inc: appliedCoupon.id }); // <<< THIS IS THE CORRECTED LINE
-            
-//         if (incrementError) {
-//             // Log this critical error for monitoring
-//             console.error(`CRITICAL: Failed to increment uses_count for coupon ID ${appliedCoupon.id}:`, incrementError.message);
-//         }
-
-//         // 2. Log the usage in the user_coupon_usage table
-//         const { error: logUsageError } = await supabase
-//             .from('user_coupon_usage')
-//             .insert({
-//                 user_id: userId,
-//                 coupon_id: appliedCoupon.id,
-//                 order_id: newOrder.id
-//             });
-
-//         if (logUsageError) {
-//             console.error(`CRITICAL: Failed to log usage for coupon ID ${appliedCoupon.id} and user ID ${userId}:`, logUsageError.message);
-//         }
-//     }
-
-  const { error: creativeError } = await supabase.from("creatives").insert({
-    order_id: newOrder.id,
-    user_id: userId,
-    file_path: creativeFilePath,
-    file_name: creativeFileName,
-    doc_type: "design",
-    image_url: publicUrl,
-  });
-
-  if (creativeError) {
-    await supabase.from("orders").delete().eq("id", newOrder.id);
-    throw new ApiError(
-      500,
-      "Could not link the creative file to the order. The order has been cancelled.",
-      creativeError
-    );
-  }
-
-  res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        order: newOrder,
-        razorpayOrder: rpOrder,
-      },
-      "Order initiated. Please proceed to payment."
-    )
-  );
 });
 
 const verifyPayment = asyncHandler(async (req, res) => {
@@ -429,7 +416,6 @@ const handleSuccessfulPayment = async ({
   razorpay_payment_id,
   razorpay_signature,
 }) => {
-
   const { data: fullOrderDetails, error: detailsError } = await supabase
     .from("orders")
     .select(
@@ -451,14 +437,15 @@ const handleSuccessfulPayment = async ({
     return;
   }
 
-
-     if (fullOrderDetails.coupon_code) {
-    console.log(`[COUPON] Order ${orderId} used coupon code: ${fullOrderDetails.coupon_code}. Attempting to commit usage.`);
+  if (fullOrderDetails.coupon_code) {
+    console.log(
+      `[COUPON] Order ${orderId} used coupon code: ${fullOrderDetails.coupon_code}. Attempting to commit usage.`
+    );
 
     const { data: coupon, error: couponError } = await supabase
-      .from('coupons')
-      .select('*')
-      .eq('code', fullOrderDetails.coupon_code)
+      .from("coupons")
+      .select("*")
+      .eq("code", fullOrderDetails.coupon_code)
       .single();
 
     if (coupon && !couponError) {
@@ -469,11 +456,15 @@ const handleSuccessfulPayment = async ({
       // This confirms this user hasn't had another payment verified for the same coupon in the last few moments.
       let hasBeenUsedByUser = false;
       if (coupon.is_single_use_per_user) {
-        const { data: usage,count, error: usageError } = await supabase
-          .from('user_coupon_usage')
-          .select('id', { count: 'exact' })
-          .eq('user_id', userId)
-          .eq('coupon_id', coupon.id);
+        const {
+          data: usage,
+          count,
+          error: usageError,
+        } = await supabase
+          .from("user_coupon_usage")
+          .select("id", { count: "exact" })
+          .eq("user_id", userId)
+          .eq("coupon_id", coupon.id);
         if (usage && !usageError && count > 0) {
           hasBeenUsedByUser = true;
         }
@@ -481,35 +472,48 @@ const handleSuccessfulPayment = async ({
 
       if (!hasBeenUsedByUser) {
         // 4. Commit the coupon usage since it's the first time for this user.
-        console.log(`[COUPON] Committing usage for coupon ID ${coupon.id} for user ${userId}.`);
+        console.log(
+          `[COUPON] Committing usage for coupon ID ${coupon.id} for user ${userId}.`
+        );
 
         // a. Increment the global uses_count
-        const { error: incrementError } = await supabase
-          .rpc('increment_coupon_uses', { coupon_id_to_inc: coupon.id });
+        const { error: incrementError } = await supabase.rpc(
+          "increment_coupon_uses",
+          { coupon_id_to_inc: coupon.id }
+        );
 
         if (incrementError) {
-          console.error(`[CRITICAL-COUPON] Failed to increment uses_count for coupon ID ${coupon.id}:`, incrementError.message);
+          console.error(
+            `[CRITICAL-COUPON] Failed to increment uses_count for coupon ID ${coupon.id}:`,
+            incrementError.message
+          );
         }
 
         // b. Log the specific usage in the user_coupon_usage table
         const { error: logUsageError } = await supabase
-          .from('user_coupon_usage')
+          .from("user_coupon_usage")
           .insert({
             user_id: userId,
             coupon_id: coupon.id,
-            order_id: orderId // Use the orderId passed to the function
+            order_id: orderId, // Use the orderId passed to the function
           });
-        
+
         if (logUsageError) {
           // This might happen if the insert runs twice for some reason, the unique constraint will protect it.
-          console.error(`[CRITICAL-COUPON] Failed to log usage for coupon ID ${coupon.id} and user ID ${userId}:`, logUsageError.message);
+          console.error(
+            `[CRITICAL-COUPON] Failed to log usage for coupon ID ${coupon.id} and user ID ${userId}:`,
+            logUsageError.message
+          );
         }
       } else {
-    
-        console.warn(`[COUPON-WARN] Payment for order ${orderId} confirmed, but coupon ${coupon.code} was already marked as used by user ${userId}. Logging as a discrepancy.`);
+        console.warn(
+          `[COUPON-WARN] Payment for order ${orderId} confirmed, but coupon ${coupon.code} was already marked as used by user ${userId}. Logging as a discrepancy.`
+        );
       }
     } else {
-        console.error(`[CRITICAL-COUPON] Could not find coupon details for code "${fullOrderDetails.coupon_code}" from paid order ${orderId}.`);
+      console.error(
+        `[CRITICAL-COUPON] Could not find coupon details for code "${fullOrderDetails.coupon_code}" from paid order ${orderId}.`
+      );
     }
   }
 
@@ -535,7 +539,6 @@ const handleSuccessfulPayment = async ({
     })
     .eq("id", orderId);
 
-  
   try {
     const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
     const invoiceFileName = `invoice-${fullOrderDetails.order_uid}.pdf`;

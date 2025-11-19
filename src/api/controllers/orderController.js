@@ -416,6 +416,28 @@ const handleSuccessfulPayment = async ({
   razorpay_payment_id,
   razorpay_signature,
 }) => {
+    //invoice logic build here
+  const { data: invoiceNumber, error: invoiceNumError } = await supabase.rpc(
+    "get_next_invoice_number"
+  );
+
+  if (invoiceNumError || !invoiceNumber) {
+    console.error(
+      `[CRITICAL] FAILED TO GENERATE INVOICE NUMBER for order ${orderId}.`,
+      invoiceNumError
+    );
+  }
+
+  await supabase
+    .from("orders")
+    .update({
+      razorpay_payment_id,
+      razorpay_signature,
+      status: "Pending Approval",
+      invoice_number: invoiceNumber, // SAVING INVOICE NUMBER FIRST
+    })
+    .eq("id", orderId);
+
   const { data: fullOrderDetails, error: detailsError } = await supabase
     .from("orders")
     .select(
@@ -517,28 +539,9 @@ const handleSuccessfulPayment = async ({
     }
   }
 
-  //invoice logic build here
-  const { data: invoiceNumber, error: invoiceNumError } = await supabase.rpc(
-    "get_next_invoice_number"
-  );
 
-  if (invoiceNumError || !invoiceNumber) {
-    console.error(
-      `[CRITICAL] FAILED TO GENERATE INVOICE NUMBER for order ${orderId}.`,
-      invoiceNumError
-    );
-  }
-
-  await supabase
-    .from("orders")
-    .update({
-      razorpay_payment_id,
-      razorpay_signature,
-      status: "Pending Approval",
-      invoice_number: invoiceNumber, // <-- SAVING THE NEWLY GENERATED INVOICE NUMBER
-    })
-    .eq("id", orderId);
-
+  
+    
   try {
     const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
     const invoiceFileName = `invoice-${fullOrderDetails.order_uid}.pdf`;

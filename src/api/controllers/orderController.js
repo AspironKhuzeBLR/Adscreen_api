@@ -430,6 +430,28 @@ const handleSuccessfulPayment = async ({
   razorpay_signature,
 }) => {
 
+  const { data: fullOrderDetails, error: detailsError } = await supabase
+    .from("orders")
+    .select(
+      `
+            *,
+            profiles ( id, full_name, email, phone_number), 
+            locations ( name ),
+            plans ( name )
+        `
+    )
+    .eq("id", orderId)
+    .single();
+
+  if (detailsError || !fullOrderDetails) {
+    console.error(
+      `CRITICAL: Failed to fetch details for order ${orderId} after payment.`,
+      detailsError
+    );
+    return;
+  }
+
+
      if (fullOrderDetails.coupon_code) {
     console.log(`[COUPON] Order ${orderId} used coupon code: ${fullOrderDetails.coupon_code}. Attempting to commit usage.`);
 
@@ -513,27 +535,7 @@ const handleSuccessfulPayment = async ({
     })
     .eq("id", orderId);
 
-  const { data: fullOrderDetails, error: detailsError } = await supabase
-    .from("orders")
-    .select(
-      `
-            *,
-            profiles ( id, full_name, email, phone_number), 
-            locations ( name ),
-            plans ( name )
-        `
-    )
-    .eq("id", orderId)
-    .single();
-
-  if (detailsError || !fullOrderDetails) {
-    console.error(
-      `CRITICAL: Failed to fetch details for order ${orderId} after payment.`,
-      detailsError
-    );
-    return;
-  }
-
+  
   try {
     const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
     const invoiceFileName = `invoice-${fullOrderDetails.order_uid}.pdf`;

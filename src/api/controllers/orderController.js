@@ -544,7 +544,7 @@ const handleSuccessfulPayment = async ({
     
   try {
     const pdfBuffer = await generateInvoicePdfBuffer(fullOrderDetails);
-    const invoiceFileName = `invoice-${fullOrderDetails.order_uid}.pdf`;
+    const invoiceFileName = `Order-${fullOrderDetails.order_uid}.pdf`;
 
     // FOR TESTING
     // For verification, save a local copy.
